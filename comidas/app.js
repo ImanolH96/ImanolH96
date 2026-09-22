@@ -146,6 +146,7 @@ function renderWhen() {
   const short = fecha === isoDate(today) ? 'Hoy' : fecha === isoDate(y) ? 'Ayer'
     : parseDate(fecha).toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/^\w/, (c) => c.toUpperCase());
   $('dayBtnText').textContent = short;
+  $('dayNext').disabled = !away;
   btn.classList.toggle('away', away);
   btn.setAttribute('aria-label', `Día: ${dayLabel(fecha).replace(/^de(l)? /, '')}. Cambiar día`);
 
@@ -200,6 +201,15 @@ $('dayBtn').onclick = () => {
   openSheet('daySheet');
 };
 $('dayUse').onclick = () => useDay($('dayPick').value);
+
+// ‹ › step one day at a time (never past today)
+function stepDay(delta) {
+  const d = parseDate(currentDate());
+  d.setDate(d.getDate() + delta);
+  useDay(isoDate(d));
+}
+$('dayPrev').onclick = () => stepDay(-1);
+$('dayNext').onclick = () => stepDay(1);
 
 // ---------- keypad ----------
 
