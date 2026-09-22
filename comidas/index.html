@@ -119,7 +119,7 @@
   /* ---------- context: when ---------- */
   .when { display: flex; flex-direction: column; gap: 10px; }
   .when-line { margin: 0; font-size: 22px; font-weight: 700; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
-  .day-nav { display: inline-flex; align-items: center; gap: 2px; }
+  .day-nav { display: flex; align-items: center; gap: 2px; margin-left: -8px; }
   .day-nav .nav { width: 34px; height: 34px; }
   .day-pill {
     display: inline-flex; align-items: center;
@@ -129,16 +129,10 @@
     display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; border-radius: 999px;
     padding: 6px 10px 6px 11px; color: var(--paper); font-size: 16px; font-weight: 600; line-height: 1.2;
   }
-  .day-clear {
-    width: 26px; height: 26px; margin-right: 4px; border: 0; border-radius: 50%;
-    display: grid; place-items: center; background: var(--comida); color: var(--ink-deep);
-  }
   .day-btn .cal { color: var(--muted); }
   .day-btn .chev { color: var(--muted); margin-left: -1px; }
   .day-pill.away { border-color: var(--comida); background: color-mix(in srgb, var(--comida) 18%, var(--panel)); }
   .day-pill.away .cal { color: var(--comida); }
-  .day-pill.away .chev { display: none; }
-  .day-pill.away .day-btn { padding-right: 6px; }
   .seg { display: flex; flex-wrap: wrap; gap: 6px; }
   .seg button {
     position: relative; border: 1.5px solid var(--line); background: transparent; color: var(--paper);
@@ -352,7 +346,8 @@
   <div class="tab" id="tab-hoy" role="tabpanel" aria-labelledby="tb-hoy">
     <button class="today-sum" id="todaySummary" type="button"></button>
   <section class="when">
-    <p class="when-line" id="whenLine"><span id="whenMeal">Cena</span> <span class="day-nav"><button type="button" class="nav" id="dayPrev" aria-label="Día anterior"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><span class="day-pill" id="dayPill"><button type="button" class="day-btn" id="dayBtn"><svg class="cal" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span id="dayBtnText">Hoy</span><svg class="chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><button type="button" class="day-clear" id="dayToday" aria-label="Volver a hoy" hidden><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></span><button type="button" class="nav" id="dayNext" aria-label="Día siguiente"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button></span></p>
+    <div class="day-nav" role="group" aria-label="Día"><button type="button" class="nav" id="dayPrev" aria-label="Día anterior"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><span class="day-pill" id="dayPill"><button type="button" class="day-btn" id="dayBtn"><svg class="cal" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span id="dayBtnText">Hoy</span><svg class="chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></span><button type="button" class="nav" id="dayNext" aria-label="Día siguiente"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button><button type="button" class="nav" id="dayToday" aria-label="Ir a hoy"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 5l7 7-7 7M13 5l7 7-7 7"/></svg></button></div>
+    <p class="when-line" id="whenLine"><span id="whenMeal">Cena</span></p>
     <div class="seg" id="segMeal" role="group" aria-label="Momento"></div>
   </section>
 
