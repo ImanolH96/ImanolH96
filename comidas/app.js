@@ -142,7 +142,10 @@ function renderWhen() {
   $('whenMeal').textContent = meal;
   const away = fecha !== isoDate(new Date());
   const btn = $('dayBtn');
-  btn.firstChild.textContent = dayLabel(fecha) + ' ';
+  const today = new Date(), y = new Date(); y.setDate(y.getDate() - 1);
+  const short = fecha === isoDate(today) ? 'Hoy' : fecha === isoDate(y) ? 'Ayer'
+    : parseDate(fecha).toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/^\w/, (c) => c.toUpperCase());
+  $('dayBtnText').textContent = short;
   btn.classList.toggle('away', away);
   btn.setAttribute('aria-label', `Día: ${dayLabel(fecha).replace(/^de(l)? /, '')}. Cambiar día`);
 
