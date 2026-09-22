@@ -38,22 +38,37 @@
   h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 24px 4px 8px; }
   .card { background: var(--card); border-radius: 14px; padding: 16px; border: 1px solid var(--border); }
   .quota { display: flex; align-items: center; gap: 16px; }
-  .quota .big { font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .quota .big { flex: none; font-size: 40px; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; }
   .quota .big.over { color: var(--danger); }
   .bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-top: 8px; }
   .bar > div { height: 100%; background: var(--accent); transition: width .3s; }
   .bar > div.over { background: var(--danger); }
   label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 4px; }
+  input, select, textarea, button { font: inherit; color: inherit; }
   input, select, textarea {
-    width: 100%; font: inherit; color: var(--text); background: var(--bg);
+    display: block; width: 100%; min-width: 0; max-width: 100%; min-height: 44px; margin: 0;
+    font-size: 16px; /* 16px stops iOS from zooming on focus */
+    color: var(--text); background: var(--bg);
     border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+    -webkit-appearance: none; appearance: none;
+  }
+  /* iOS Safari: date/time inputs ignore width, center their value and collapse when empty */
+  input[type="date"], input[type="time"] { line-height: 22px; text-align: left; }
+  input::-webkit-date-and-time-value { text-align: left; margin: 0; }
+  input::-webkit-datetime-edit { padding: 0; }
+  select {
+    padding-right: 32px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%;
+    background-size: 5px 5px; background-repeat: no-repeat;
   }
   textarea { min-height: 70px; resize: vertical; }
   .row { display: flex; gap: 8px; }
   .row > * { flex: 1; min-width: 0; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  button { -webkit-appearance: none; appearance: none; cursor: pointer; }
   .chips button {
-    flex: none; border: 1px solid var(--border); background: var(--bg); color: var(--text);
+    flex: none; line-height: 1.2; border: 1px solid var(--border); background: var(--bg); color: var(--text);
     border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 14px;
   }
   .chips button.on { background: var(--accent-soft); border-color: var(--accent); }
@@ -63,19 +78,21 @@
   }
   .btn.secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
   .btn.small { display: inline-block; width: auto; padding: 8px 14px; margin: 0; font-size: 14px; }
-  .icon-btn { background: none; border: 0; font-size: 22px; color: var(--text); padding: 4px 8px; }
+  .icon-btn { background: none; border: 0; font-size: 20px; line-height: 1; color: var(--text); padding: 6px; }
+  .actions { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }
+  .actions > div { display: flex; }
   ul.list { list-style: none; margin: 0; padding: 0; }
   ul.list li { padding: 12px 0; border-bottom: 1px solid var(--border); display: flex; gap: 12px; }
   ul.list li:last-child { border-bottom: 0; }
   .meta { font-size: 13px; color: var(--muted); }
   .desc { font-weight: 600; }
   .grow { flex: 1; min-width: 0; }
-  .tag { font-size: 12px; background: var(--accent-soft); border-radius: 6px; padding: 2px 6px; }
+  .tag { white-space: nowrap; font-size: 12px; background: var(--accent-soft); border-radius: 6px; padding: 2px 6px; }
   .empty { color: var(--muted); text-align: center; padding: 16px 0; }
   .toast {
     position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 24px); transform: translateX(-50%);
     background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px;
-    opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90%;
+    opacity: 0; transition: opacity .2s; pointer-events: none; width: max-content; max-width: calc(100% - 32px); text-align: center;
   }
   .toast.show { opacity: 1; }
   .hidden, [hidden] { display: none !important; }
@@ -87,7 +104,9 @@
   }
   .overlay .card { width: 100%; max-width: 480px; margin: 0 auto; }
   .overlay .btn { margin-top: 10px; }
-  .stars button { font-size: 24px; background: none; border: 0; padding: 0 4px; opacity: .3; }
+  .stars { display: flex; gap: 4px; }
+  .stars button { font-size: 26px; line-height: 1; background: none; border: 0; padding: 2px; opacity: .3; filter: grayscale(1); }
+  .stars button.on { filter: none; }
   .stars button.on { opacity: 1; }
 </style>
 </head>

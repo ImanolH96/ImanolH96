@@ -196,8 +196,10 @@ function renderList() {
     del.setAttribute('aria-label', 'Borrar');
     del.onclick = () => remove(e.id);
     const right = document.createElement('div');
-    right.style.textAlign = 'right';
-    right.append(tag, document.createElement('br'), edit, del);
+    right.className = 'actions';
+    const btns = document.createElement('div');
+    btns.append(edit, del);
+    right.append(tag, btns);
     li.append(body, right);
     list.appendChild(li);
   }
