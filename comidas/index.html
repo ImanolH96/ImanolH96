@@ -142,6 +142,27 @@
   .month-total { margin: 0; color: var(--muted); }
   .month-total b { color: var(--paper); font-size: 22px; font-variant-numeric: tabular-nums; }
   .month-total span { display: block; margin-top: 2px; }
+  .chart-wrap { position: relative; margin: 4px 0 6px; }
+  .chart-wrap svg { display: block; width: 100%; height: auto; overflow: visible; touch-action: pan-y; }
+  .chart-wrap figcaption { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  #chart .grid { stroke: var(--line); stroke-width: 1; opacity: .55; }
+  #chart .axis { stroke: var(--line); stroke-width: 1; }
+  #chart .tick { fill: var(--muted); font-size: 11px; font-family: var(--font); font-variant-numeric: tabular-nums; }
+  #chart .pace { stroke: var(--muted); stroke-width: 1.5; opacity: .75; }
+  #chart .series { fill: none; stroke: var(--comida); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  #chart .wash { fill: var(--comida); opacity: .12; }
+  #chart .end { fill: var(--comida); stroke: var(--ink); stroke-width: 2; }
+  #chart .end.over { fill: var(--over); }
+  #chart .endlabel { fill: var(--paper); font-size: 13px; font-weight: 700; font-family: var(--font); }
+  #chart .cross { stroke: var(--paper); stroke-width: 1; opacity: .5; }
+  #chart .hit { fill: transparent; }
+  .chart-tip {
+    position: absolute; top: 0; pointer-events: none; z-index: 5;
+    background: var(--paper); color: var(--ink); border-radius: 12px; padding: 8px 10px;
+    font-size: 13px; line-height: 1.35; white-space: nowrap; box-shadow: 0 6px 20px rgb(0 0 0 / .3);
+  }
+  .chart-tip b, .chart-tip span { display: block; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .weeks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
   .wk {
     width: 100%; display: grid; grid-template-columns: 10.5em 1fr 3.2em; align-items: center; gap: 12px;
@@ -275,6 +296,12 @@
       <button class="nav" id="moNext" type="button" aria-label="Mes siguiente"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
     </div>
     <p class="month-total" id="monthTotal"></p>
+    <figure class="chart-wrap">
+      <svg id="chart" role="img" aria-label="Comidas libres acumuladas en el mes comparadas con el límite"></svg>
+      <div class="chart-tip" id="chartTip" hidden></div>
+      <figcaption>Acumulado del mes. La línea fina es el límite según tus comidas libres por semana.</figcaption>
+      <table class="sr-only" id="chartTable"></table>
+    </figure>
     <ul class="weeks" id="monthWeeks"></ul>
   </section>
 

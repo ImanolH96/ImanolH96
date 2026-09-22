@@ -453,11 +453,14 @@ function renderMonth() {
   const total = inMonth.reduce((n, e) => n + thirdsOf(e), 0);
   const counts = PARTS.map(([k, , icon]) => `${icon} ${inMonth.filter((e) => e.partes[k]).length}`).join('   ');
   $('monthTotal').innerHTML = '';
+  const allowed = Math.round(((Number(state.settings.quota) || 0) * new Date(y, m + 1, 0).getDate() / 7) * 3);
   $('monthTotal').append(
     Object.assign(document.createElement('b'), { textContent: fmtThirds(total) }),
-    total === 3 ? ' comida libre en el mes' : total > 0 && total < 3 ? ' de comida libre en el mes' : ' comidas libres en el mes',
+    ` de ${fmtThirds(allowed)} comidas libres en el mes`,
     Object.assign(document.createElement('span'), { textContent: counts }),
   );
+
+  renderChart(y, m, inMonth);
 
   // every week that touches the month, counted whole
   const quota = (Number(state.settings.quota) || 0) * 3;
@@ -494,6 +497,117 @@ function renderMonth() {
     to = isoDate(end);
   }
 }
+
+// ---------- month chart: cumulative free meals vs. allowed pace ----------
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function el(name, attrs, parent) {
+  const n = document.createElementNS(SVG_NS, name);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(n);
+  return n;
+}
+
+let chartData = null; // what the hover layer reads
+
+function renderChart(y, m, inMonth) {
+  const days = new Date(y, m + 1, 0).getDate();
+  const now = new Date();
+  const isCurrent = y === now.getFullYear() && m === now.getMonth();
+  const lastDay = isCurrent ? now.getDate() : days; // don't draw the future
+
+  const perDay = new Array(days + 1).fill(0); // thirds logged on each day
+  for (const e of inMonth) perDay[Number(e.fecha.slice(8, 10))] += thirdsOf(e);
+  const cum = [0];
+  for (let d = 1; d <= days; d++) cum[d] = cum[d - 1] + perDay[d];
+  const quota = Number(state.settings.quota) || 0;
+  const pace = (d) => (quota * d) / 7; // allowed free meals by the end of day d
+
+  const W = 340, H = 180, L = 26, R = 40, T = 12, B = 24;
+  const maxY = Math.max(1, Math.ceil(Math.max(cum[lastDay] / 3, pace(days))));
+  const x = (d) => L + ((d - 0.5) / days) * (W - L - R);
+  const yv = (v) => T + (1 - v / maxY) * (H - T - B);
+
+  const svg = $('chart');
+  svg.innerHTML = '';
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+  // grid + y ticks (clean integers)
+  const step = maxY <= 5 ? 1 : maxY <= 10 ? 2 : 5;
+  for (let v = 0; v <= maxY; v += step) {
+    el('line', { x1: L, x2: W - R + 8, y1: yv(v), y2: yv(v), class: v === 0 ? 'axis' : 'grid' }, svg);
+    el('text', { x: L - 8, y: yv(v) + 4, class: 'tick', 'text-anchor': 'end' }, svg).textContent = v;
+  }
+  // x ticks: weekly-ish plus the last day
+  for (const d of [1, 8, 15, 22, days]) {
+    el('text', { x: x(d), y: H - 6, class: 'tick', 'text-anchor': 'middle' }, svg).textContent = d;
+  }
+
+  // allowed pace
+  el('line', { x1: x(0.5), y1: yv(pace(0)), x2: x(days + 0.5), y2: yv(pace(days)), class: 'pace' }, svg);
+  el('text', { x: W - R + 4, y: yv(pace(days)) + 4, class: 'tick' }, svg).textContent = 'límite';
+
+  // cumulative step line (steps at the end of each day) + wash
+  let d = `M${x(0.5)} ${yv(0)}`;
+  for (let i = 1; i <= lastDay; i++) d += ` H${x(i - 0.5)} V${yv(cum[i] / 3)}`;
+  d += ` H${x(lastDay + 0.5)}`;
+  el('path', { d: `${d} V${yv(0)} H${x(0.5)} Z`, class: 'wash' }, svg);
+  el('path', { d, class: 'series' }, svg);
+
+  // end marker + direct label
+  const endV = cum[lastDay] / 3;
+  el('circle', { cx: x(lastDay + 0.5), cy: yv(endV), r: 5, class: 'end' + (endV > pace(lastDay) ? ' over' : '') }, svg);
+  el('text', { x: Math.min(x(lastDay + 0.5) + 9, W - 4), y: yv(endV) - 8, class: 'endlabel', 'text-anchor': x(lastDay + 0.5) > W - R - 10 ? 'end' : 'start' }, svg)
+    .textContent = fmtThirds(cum[lastDay]);
+
+  // hover layer
+  const cross = el('line', { y1: T, y2: H - B, class: 'cross', visibility: 'hidden' }, svg);
+  const dot = el('circle', { r: 5, class: 'end', visibility: 'hidden' }, svg);
+  el('rect', { x: L, y: 0, width: W - L - R, height: H, class: 'hit' }, svg);
+  chartData = { y, m, days, lastDay, perDay, cum, pace, x, yv, W, L, R, cross, dot };
+
+  // table view for screen readers
+  const rows = [];
+  for (let i = 1; i <= lastDay; i++) if (perDay[i]) rows.push(`<tr><td>${i}</td><td>${fmtThirds(perDay[i])}</td><td>${fmtThirds(cum[i])}</td></tr>`);
+  $('chartTable').innerHTML = `<caption>Comidas libres por día en ${MONTH(new Date(y, m, 1))}</caption>`
+    + '<tr><th>Día</th><th>Ese día</th><th>Acumulado</th></tr>' + rows.join('');
+  hideTip();
+}
+
+function hideTip() {
+  $('chartTip').hidden = true;
+  if (chartData) { chartData.cross.setAttribute('visibility', 'hidden'); chartData.dot.setAttribute('visibility', 'hidden'); }
+}
+
+function showTip(ev) {
+  const c = chartData;
+  if (!c) return;
+  const svg = $('chart');
+  const box = svg.getBoundingClientRect();
+  const sx = ((ev.clientX - box.left) / box.width) * c.W;
+  const day = Math.max(1, Math.min(c.lastDay, Math.round(((sx - c.L) / (c.W - c.L - c.R)) * c.days + 0.5)));
+  const cx = c.x(day);
+  c.cross.setAttribute('x1', cx); c.cross.setAttribute('x2', cx); c.cross.setAttribute('visibility', 'visible');
+  c.dot.setAttribute('cx', cx); c.dot.setAttribute('cy', c.yv(c.cum[day] / 3)); c.dot.setAttribute('visibility', 'visible');
+  const date = new Date(c.y, c.m, day).toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' });
+  const tip = $('chartTip');
+  tip.innerHTML = '';
+  tip.append(
+    Object.assign(document.createElement('b'), { textContent: date }),
+    Object.assign(document.createElement('span'), { textContent: `Acumulado: ${fmtThirds(c.cum[day])}` }),
+    Object.assign(document.createElement('span'), { textContent: c.perDay[day] ? `Ese día: ${fmtThirds(c.perDay[day])}` : 'Ese día: nada' }),
+    Object.assign(document.createElement('span'), { textContent: `Límite a la fecha: ${fmtThirds(Math.round(c.pace(day) * 3))}` }),
+  );
+  tip.hidden = false;
+  // sit beside the crosshair, on whichever side has room
+  const px = (cx / c.W) * box.width;
+  const w = tip.offsetWidth;
+  tip.style.left = `${px + 12 + w <= box.width ? px + 12 : Math.max(0, px - 12 - w)}px`;
+}
+
+$('chart').addEventListener('pointermove', showTip);
+$('chart').addEventListener('pointerdown', showTip);
+$('chart').addEventListener('pointerleave', hideTip);
 
 $('moPrev').onclick = () => { monthRef = new Date(monthRef.getFullYear(), monthRef.getMonth() - 1, 1); renderMonth(); };
 $('moNext').onclick = () => { monthRef = new Date(monthRef.getFullYear(), monthRef.getMonth() + 1, 1); renderMonth(); };
