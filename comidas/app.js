@@ -192,12 +192,6 @@ function renderStrip() {
     const wd = d.toLocaleDateString('es', { weekday: 'short' }).replace('.', '');
     b.append(Object.assign(document.createElement('small'), { textContent: wd.charAt(0).toUpperCase() }),
       Object.assign(document.createElement('b'), { textContent: d.getDate() }));
-    const dots = document.createElement('span');
-    dots.className = 'sdots';
-    for (const [k] of PARTS) {
-      if (list.some((e) => e.partes[k])) dots.appendChild(Object.assign(document.createElement('i'), { style: `background:${PART_COLOR[k]}` }));
-    }
-    b.appendChild(dots);
     const long = d.toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' });
     const n = list.reduce((t, e) => t + thirdsOf(e), 0);
     b.setAttribute('aria-label', `${iso === today ? 'Hoy, ' : ''}${long}${n ? `, ${fmtThirds(n)} registrado` : ''}`);

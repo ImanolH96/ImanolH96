@@ -149,9 +149,6 @@
   .sday.today[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--comida); }
   .sday:disabled { opacity: .3; cursor: default; }
   .sday:not(:disabled):not([aria-pressed="true"]):active { background: var(--panel); }
-  .sdots { display: flex; gap: 3px; height: 6px; }
-  .sdots i { width: 6px; height: 6px; border-radius: 50%; }
-  .sday[aria-pressed="true"] .sdots i { box-shadow: 0 0 0 1.5px var(--ink); }
   .to-today {
     flex: none; display: inline-flex; align-items: center; gap: 5px; height: 36px;
     border: 0; background: none; color: var(--comida); padding: 0 8px;
