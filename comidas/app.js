@@ -139,8 +139,12 @@ const withArticle = (m) => (['Merienda', 'Cena'].includes(m) ? 'la ' : 'el ') + 
 function renderWhen() {
   const meal = currentMeal();
   const fecha = currentDate();
-  $('whenLine').innerHTML = '';
-  $('whenLine').append(meal + ' ', Object.assign(document.createElement('span'), { textContent: dayLabel(fecha) }));
+  $('whenMeal').textContent = meal;
+  const away = fecha !== isoDate(new Date());
+  const btn = $('dayBtn');
+  btn.firstChild.textContent = dayLabel(fecha) + ' ';
+  btn.classList.toggle('away', away);
+  btn.setAttribute('aria-label', `Día: ${dayLabel(fecha).replace(/^de(l)? /, '')}. Cambiar día`);
 
   const seg = $('segMeal');
   seg.innerHTML = '';
@@ -157,22 +161,8 @@ function renderWhen() {
     };
     seg.appendChild(b);
   }
-  for (const b of $('segDay').querySelectorAll('button[data-day]')) {
-    b.setAttribute('aria-pressed', String(Number(b.dataset.day) === dayOffset));
-  }
-  $('dayOtherBtn').setAttribute('aria-pressed', String(dayOffset === null));
-  $('dayOtherBtn').textContent = dayOffset === null ? fmtDay(pickedDate) : 'Otro día';
 }
 
-for (const b of $('segDay').querySelectorAll('button[data-day]')) {
-  b.onclick = () => {
-    dayOffset = Number(b.dataset.day);
-    pickedDate = null;
-    if (dayOffset === 0) pickedMeal = null; // back to today: meal follows the clock again
-    renderWhen();
-    renderPad();
-  };
-}
 function useDay(v) {
   if (!v) return;
   const today = isoDate(new Date());
@@ -183,20 +173,20 @@ function useDay(v) {
   renderPad();
 }
 
-// "Otro día": a sheet with the last days as buttons plus a visible date field
-// (an invisible date input over a button doesn't open the picker on iOS).
-$('dayOtherBtn').onclick = () => {
+// The day in "Cena de hoy ▾" opens a sheet with recent days as buttons plus a visible
+// date field (an invisible date input over a button doesn't open the picker on iOS).
+$('dayBtn').onclick = () => {
   const grid = $('dayGrid');
   grid.innerHTML = '';
   const current = currentDate();
-  for (let i = 2; i <= 7; i++) {
+  for (let i = 0; i <= 8; i++) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const iso = isoDate(d);
     const b = document.createElement('button');
     b.type = 'button';
     b.setAttribute('aria-pressed', String(iso === current));
-    const wd = d.toLocaleDateString('es', { weekday: 'long' });
+    const wd = i === 0 ? 'hoy' : i === 1 ? 'ayer' : d.toLocaleDateString('es', { weekday: 'long' });
     b.append(wd.charAt(0).toUpperCase() + wd.slice(1),
       Object.assign(document.createElement('small'), { textContent: d.toLocaleDateString('es', { day: 'numeric', month: 'short' }) }));
     b.onclick = () => useDay(iso);
