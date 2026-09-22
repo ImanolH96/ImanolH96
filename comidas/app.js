@@ -491,6 +491,7 @@ function renderMonth() {
   );
   $('monthStatus').innerHTML = '';
   $('monthStatus').appendChild(statusPill(mst));
+  $('monthAdvice').textContent = isCur ? monthAdvice(total, allowed, new Date(y, m + 1, 0).getDate() - now.getDate() + 1, new Date(y, m + 1, 0)) : '';
 
   renderChart(y, m, inMonth);
 
@@ -529,6 +530,21 @@ function renderMonth() {
     const end = new Date(next); end.setDate(end.getDate() + 6);
     to = isoDate(end);
   }
+}
+
+// One sentence that turns the month's deviation into what's left to do.
+// used/allowed in thirds; daysLeft counts today.
+function monthAdvice(used, allowed, daysLeft, lastDate) {
+  const quota = (Number(state.settings.quota) || 0) * 3;
+  const left = allowed - used;
+  const endLabel = `el ${lastDate.getDate()}`;
+  const dias = daysLeft === 1 ? 'hoy' : `los ${daysLeft} días que faltan`;
+  if (left < 0) return `Te pasaste ${fmtThirds(-left)} en el mes. Sin comidas libres hasta ${endLabel} evitás que crezca el desvío.`;
+  if (left === 0) return `Ya usaste todo lo del mes. Lo ideal es no sumar más hasta ${endLabel}.`;
+  if (daysLeft < 7) return `Te quedan ${fmtThirds(left)} para ${dias} del mes.`;
+  const perWeek = Math.floor((left * 7) / daysLeft); // thirds per week, rounded down
+  if (perWeek >= quota) return `Te quedan ${fmtThirds(left)} para ${dias}. Podés seguir con tu cupo normal.`;
+  return `Te quedan ${fmtThirds(left)} para ${dias}: unas ${fmtThirds(perWeek)} por semana para cerrar el mes en el plan.`;
 }
 
 // ---------- month chart: cumulative free meals vs. allowed pace ----------
@@ -579,6 +595,14 @@ function renderCumulative(y, m, inMonth) {
   // allowed pace
   el('line', { x1: x(0.5), y1: yv(pace(0)), x2: x(days + 0.5), y2: yv(pace(days)), class: 'pace' }, svg);
   el('text', { x: W - R + 4, y: yv(pace(days)) + 4, class: 'tick' }, svg).textContent = 'límite';
+
+  // the way back to plan: from today's total to the month's allowance
+  const allowedEnd = Math.round(pace(days) * 3) / 3;
+  const showPath = isCurrent && lastDay < days && cum[lastDay] / 3 < allowedEnd;
+  if (showPath) {
+    el('line', { x1: x(lastDay + 0.5), y1: yv(cum[lastDay] / 3), x2: x(days + 0.5), y2: yv(allowedEnd), class: 'path' }, svg);
+  }
+  $('chartCaption').textContent = CAPTIONS.acum + (showPath ? ' La punteada es el margen que te queda hasta fin de mes.' : '');
 
   // cumulative step line (steps at the end of each day) + wash
   let d = `M${x(0.5)} ${yv(0)}`;

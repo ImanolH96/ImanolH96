@@ -159,6 +159,9 @@
   .month-total { margin: 0; color: var(--muted); }
   .month-total b { color: var(--paper); font-size: 22px; font-variant-numeric: tabular-nums; }
   .month-total span { display: block; margin-top: 2px; }
+  .month-advice { margin: 0; font-size: 15px; line-height: 1.45; max-width: 36em; }
+  .month-advice:empty { display: none; }
+  #chart .path { stroke: var(--comida); stroke-width: 1.5; stroke-dasharray: 4 4; opacity: .8; }
   .chart-wrap { position: relative; margin: 4px 0 6px; }
   .chart-wrap svg { display: block; width: 100%; height: auto; overflow: visible; touch-action: pan-y; }
   .chart-wrap figcaption { font-size: 13px; color: var(--muted); margin-top: 2px; }
@@ -336,6 +339,7 @@
     </div>
     <p class="month-total" id="monthTotal"></p>
     <div id="monthStatus"></div>
+    <p class="month-advice" id="monthAdvice"></p>
     <div class="seg chart-switch" id="chartSwitch" role="group" aria-label="Tipo de gráfica"></div>
     <figure class="chart-wrap">
       <svg id="chart" role="img" aria-label="Gráfica de comidas libres del mes"></svg>
