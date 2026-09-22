@@ -5,7 +5,7 @@ Todo corre en el dispositivo: sin servidor, sin cuentas, sin backend. Funciona o
 
 ## Qué hace
 
-Tres pestañas abajo: **Hoy** (registrar, abre siempre acá), **Semana** y **Mes**. Exportar/importar Excel está en ⚙️ Ajustes.
+Tres pestañas abajo: **Registrar** (abre siempre en el día de hoy; se puede cambiar a ayer u otro día), **Semana** y **Mes**. Exportar/importar Excel está en ⚙️ Ajustes.
 
 - **Botonera de un toque**: 🍔 Comida fuera del plan, 🍷 Alcohol y 🍰 Dulce. Cada tecla suma ⅓; las tres juntas son una comida libre.
 - Usa la fecha de hoy y detecta el momento por la hora (editable en ⚙️):

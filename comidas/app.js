@@ -497,7 +497,7 @@ function renderToday() {
 
 // ---------- tabs ----------
 
-const TAB_TITLES = { hoy: 'Hoy', semana: 'Semana', mes: 'Mes' };
+const TAB_TITLES = { hoy: 'Registrar', semana: 'Semana', mes: 'Mes' };
 function showTab(t) {
   for (const k of Object.keys(TAB_TITLES)) {
     $(`tab-${k}`).hidden = k !== t;
@@ -1280,7 +1280,13 @@ function toast(msg, undo) {
 $('toastUndo').onclick = () => { const fn = toastUndo; toastUndo = null; if (fn) fn(); };
 
 // Keep "today" and the auto-detected meal fresh when the app comes back to the foreground.
-document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
+// Coming back after a while (30 min) resets Registrar to today, so a leftover "Ayer" isn't used by mistake.
+let hiddenAt = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { hiddenAt = Date.now(); return; }
+  if (hiddenAt && Date.now() - hiddenAt > 30 * 60 * 1000) { dayOffset = 0; pickedDate = null; pickedMeal = null; }
+  render();
+});
 setInterval(render, 60 * 1000);
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
