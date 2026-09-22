@@ -140,16 +140,7 @@ function renderWhen() {
   const meal = currentMeal();
   const fecha = currentDate();
   $('whenMeal').textContent = meal;
-  const away = fecha !== isoDate(new Date());
-  const btn = $('dayBtn');
-  const today = new Date(), y = new Date(); y.setDate(y.getDate() - 1);
-  const short = fecha === isoDate(today) ? 'Hoy' : fecha === isoDate(y) ? 'Ayer'
-    : parseDate(fecha).toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/^\w/, (c) => c.toUpperCase());
-  $('dayBtnText').textContent = short;
-  $('dayNext').disabled = !away;
-  $('dayToday').hidden = !away;
-  $('dayPill').classList.toggle('away', away);
-  btn.setAttribute('aria-label', `Día: ${dayLabel(fecha).replace(/^de(l)? /, '')}. Cambiar día`);
+  renderStrip();
 
   const seg = $('segMeal');
   seg.innerHTML = '';
@@ -168,17 +159,65 @@ function renderWhen() {
   }
 }
 
+// ---------- week strip: pick the day to log ----------
+
+let stripOffset = 0; // weeks back from this week shown in the strip
+
+function renderStrip() {
+  const ref = new Date();
+  ref.setDate(ref.getDate() - 7 * stripOffset);
+  const [from] = weekBounds(ref);
+  const today = isoDate(new Date());
+  const selected = currentDate();
+  const start = parseDate(from);
+  const mid = new Date(start); mid.setDate(mid.getDate() + 3);
+  const month = MONTH(mid);
+  $('stripMonth').textContent = month.charAt(0).toUpperCase() + month.slice(1)
+    + (mid.getFullYear() !== new Date().getFullYear() ? ` ${mid.getFullYear()}` : '');
+  $('dayNext').disabled = stripOffset === 0;
+  $('dayToday').hidden = selected === today && stripOffset === 0;
+
+  const box = $('stripDays');
+  box.innerHTML = '';
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    const iso = isoDate(d);
+    const list = state.entries.filter((e) => e.fecha === iso);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sday' + (iso === today ? ' today' : '');
+    b.disabled = iso > today;
+    b.setAttribute('aria-pressed', String(iso === selected));
+    const wd = d.toLocaleDateString('es', { weekday: 'short' }).replace('.', '');
+    b.append(Object.assign(document.createElement('small'), { textContent: wd.charAt(0).toUpperCase() }),
+      Object.assign(document.createElement('b'), { textContent: d.getDate() }));
+    const dots = document.createElement('span');
+    dots.className = 'sdots';
+    for (const [k] of PARTS) {
+      if (list.some((e) => e.partes[k])) dots.appendChild(Object.assign(document.createElement('i'), { style: `background:${PART_COLOR[k]}` }));
+    }
+    b.appendChild(dots);
+    const long = d.toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' });
+    const n = list.reduce((t, e) => t + thirdsOf(e), 0);
+    b.setAttribute('aria-label', `${iso === today ? 'Hoy, ' : ''}${long}${n ? `, ${fmtThirds(n)} registrado` : ''}`);
+    b.onclick = () => useDay(iso);
+    box.appendChild(b);
+  }
+}
+
 function useDay(v) {
   if (!v) return;
   const today = isoDate(new Date());
   if (v > today) { toast('Elegí hoy o un día anterior'); return; }
   if (v === today) { dayOffset = 0; pickedDate = null; pickedMeal = null; } else { dayOffset = null; pickedDate = v; }
+  stripOffset = weekOffsetOf(v);
   closeSheet('daySheet');
   renderWhen();
   renderPad();
 }
 
-// The day in "Cena de hoy ▾" opens a sheet with recent days as buttons plus a visible
+// The month name opens a sheet for far-away dates: recent days as buttons plus a visible
 // date field (an invisible date input over a button doesn't open the picker on iOS).
 $('dayBtn').onclick = () => {
   const grid = $('dayGrid');
@@ -203,15 +242,10 @@ $('dayBtn').onclick = () => {
 };
 $('dayUse').onclick = () => useDay($('dayPick').value);
 
-// ‹ › step one day at a time (never past today); "Ir a hoy" jumps back
-function stepDay(delta) {
-  const d = parseDate(currentDate());
-  d.setDate(d.getDate() + delta);
-  useDay(isoDate(d));
-}
-$('dayPrev').onclick = () => stepDay(-1);
+// ‹ › browse weeks in the strip (never past this week); "Hoy" jumps back
+$('dayPrev').onclick = () => { stripOffset += 1; renderStrip(); };
+$('dayNext').onclick = () => { stripOffset = Math.max(0, stripOffset - 1); renderStrip(); };
 $('dayToday').onclick = () => useDay(isoDate(new Date()));
-$('dayNext').onclick = () => stepDay(1);
 
 // ---------- keypad ----------
 
@@ -1321,7 +1355,7 @@ $('toastUndo').onclick = () => { const fn = toastUndo; toastUndo = null; if (fn)
 let hiddenAt = 0;
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { hiddenAt = Date.now(); return; }
-  if (hiddenAt && Date.now() - hiddenAt > 30 * 60 * 1000) { dayOffset = 0; pickedDate = null; pickedMeal = null; }
+  if (hiddenAt && Date.now() - hiddenAt > 30 * 60 * 1000) { dayOffset = 0; pickedDate = null; pickedMeal = null; stripOffset = 0; }
   render();
 });
 setInterval(render, 60 * 1000);
