@@ -1,5 +1,5 @@
 // Cache-first service worker: after the first visit the app works fully offline.
-const CACHE = 'comidas-libres-v12';
+const CACHE = 'comidas-libres-v13';
 const ASSETS = ['./', 'index.html', 'app.js', 'vendor/xlsx.mini.min.js', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png', 'fonts/bricolage.woff2'];
 
 self.addEventListener('install', (e) => {

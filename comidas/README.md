@@ -5,6 +5,8 @@ Todo corre en el dispositivo: sin servidor, sin cuentas, sin backend. Funciona o
 
 ## Qué hace
 
+Tres pestañas abajo: **Hoy** (registrar, abre siempre acá), **Semana** y **Mes**. Exportar/importar Excel está en ⚙️ Ajustes.
+
 - **Botonera de un toque**: 🍔 Comida fuera del plan, 🍷 Alcohol y 🍰 Dulce. Cada tecla suma ⅓; las tres juntas son una comida libre.
 - Usa la fecha de hoy y detecta el momento por la hora (editable en ⚙️):
   Desayuno 05:00–11:00 · Almuerzo 11:00–15:30 · Merienda 15:30–19:00 · Cena 19:00–05:00.

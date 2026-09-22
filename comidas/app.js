@@ -215,6 +215,7 @@ function occasion(fecha, momento) {
 }
 
 function renderPad() {
+  if ($('dayList')) renderToday();
   const occ = occasion(currentDate(), currentMeal());
   for (const key of $('pad').querySelectorAll('.key')) {
     const part = key.dataset.part;
@@ -426,38 +427,88 @@ function renderList() {
       : 'Sin registros esa semana.';
     list.appendChild(li);
   }
-  for (const e of sorted) {
-    const li = document.createElement('li');
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'entry';
-    b.onclick = () => openEdit(e.id);
-
-    const dots = document.createElement('span');
-    dots.className = 'dots';
-    for (const [k] of PARTS) {
-      const d = document.createElement('span');
-      d.className = 'dot';
-      if (e.partes[k]) { d.style.background = PART_COLOR[k]; d.style.borderColor = PART_COLOR[k]; }
-      dots.appendChild(d);
-    }
-    const what = document.createElement('span');
-    what.className = 'what';
-    const t = document.createElement('b');
-    t.textContent = `${e.momento} ${dayLabel(e.fecha)}`;
-    const sub = document.createElement('span');
-    const parts = PARTS.filter(([k]) => e.partes[k]).map(([, l]) => l.toLowerCase()).join(', ');
-    sub.textContent = e.descripcion || e.notas || parts.charAt(0).toUpperCase() + parts.slice(1);
-    what.append(t, sub);
-    const val = document.createElement('span');
-    val.className = 'val';
-    val.textContent = fmtThirds(thirdsOf(e));
-    b.append(dots, what, val);
-    b.setAttribute('aria-label', `${e.momento} ${dayLabel(e.fecha)}: ${parts}. Editar`);
-    li.appendChild(b);
-    list.appendChild(li);
-  }
+  for (const e of sorted) list.appendChild(entryRow(e, `${e.momento} ${dayLabel(e.fecha)}`));
 }
+
+function entryRow(e, title) {
+  const li = document.createElement('li');
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'entry';
+  b.onclick = () => openEdit(e.id);
+
+  const dots = document.createElement('span');
+  dots.className = 'dots';
+  for (const [k] of PARTS) {
+    const d = document.createElement('span');
+    d.className = 'dot';
+    if (e.partes[k]) { d.style.background = PART_COLOR[k]; d.style.borderColor = PART_COLOR[k]; }
+    dots.appendChild(d);
+  }
+  const what = document.createElement('span');
+  what.className = 'what';
+  const t = document.createElement('b');
+  t.textContent = title;
+  const sub = document.createElement('span');
+  const parts = PARTS.filter(([k]) => e.partes[k]).map(([, l]) => l.toLowerCase()).join(', ');
+  sub.textContent = e.descripcion || e.notas || parts.charAt(0).toUpperCase() + parts.slice(1);
+  what.append(t, sub);
+  const val = document.createElement('span');
+  val.className = 'val';
+  val.textContent = fmtThirds(thirdsOf(e));
+  b.append(dots, what, val);
+  b.setAttribute('aria-label', `${title}: ${parts}. Editar`);
+  li.appendChild(b);
+  return li;
+}
+
+// ---------- Hoy tab: this week at a glance + the selected day's entries ----------
+
+function renderToday() {
+  const [from, to] = weekBounds();
+  const used = thirdsBetween(from, to);
+  const quota = (Number(state.settings.quota) || 0) * 3;
+  const left = quota - used;
+  const st = weekStatus(used, quota, false);
+  const box = $('todaySummary');
+  box.innerHTML = '';
+  const t = document.createElement('span');
+  t.className = 't';
+  t.append(Object.assign(document.createElement('small'), { textContent: 'Esta semana' }),
+    Object.assign(document.createElement('b'), {
+      textContent: left >= 0 ? `Te quedan ${fmtThirds(left)} de ${quota / 3}` : `${fmtThirds(used)} de ${quota / 3}`,
+    }));
+  box.append(t, statusPill(st));
+  box.setAttribute('aria-label', `Esta semana: ${t.lastChild.textContent}, ${st.label}. Ver semana`);
+
+  const fecha = currentDate();
+  const list = $('dayList');
+  list.innerHTML = '';
+  $('dayTitle').textContent = `Registros ${dayLabel(fecha)}`;
+  const day = state.entries.filter((e) => e.fecha === fecha).sort((a, b) => a.hora.localeCompare(b.hora));
+  if (!day.length) {
+    list.appendChild(Object.assign(document.createElement('li'), {
+      className: 'empty',
+      textContent: fecha === isoDate(new Date()) ? 'Nada registrado hoy.' : 'Nada registrado ese día.',
+    }));
+  }
+  for (const e of day) list.appendChild(entryRow(e, `${e.momento}, ${e.hora}`));
+}
+
+// ---------- tabs ----------
+
+const TAB_TITLES = { hoy: 'Hoy', semana: 'Semana', mes: 'Mes' };
+function showTab(t) {
+  for (const k of Object.keys(TAB_TITLES)) {
+    $(`tab-${k}`).hidden = k !== t;
+    $(`tb-${k}`).setAttribute('aria-selected', String(k === t));
+  }
+  $('tabTitle').textContent = TAB_TITLES[t];
+  hideTip();
+  window.scrollTo(0, 0);
+}
+for (const b of document.querySelectorAll('.tabbar button')) b.onclick = () => showTab(b.dataset.tab);
+$('todaySummary').onclick = () => { goWeek(0); showTab('semana'); };
 
 // ---------- month ----------
 
@@ -509,7 +560,7 @@ function renderMonth() {
     b.type = 'button';
     const st = weekStatus(used, quota, to < today);
     b.className = `wk s-${st.key}` + (offset === weekOffset ? ' on' : '');
-    b.onclick = () => { weekOffset = offset; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    b.onclick = () => { weekOffset = offset; render(); showTab('semana'); };
     const icon = Object.assign(document.createElement('i'), { className: 'st', textContent: st.icon, ariaHidden: 'true' });
     const label = Object.assign(document.createElement('span'), { textContent: weekRangeLabel(from, to, true) });
     const bar = document.createElement('span');
@@ -926,6 +977,7 @@ function render() {
   renderWhen();
   renderPad();
   renderList();
+  renderToday();
   renderMonth();
 }
 
@@ -1182,6 +1234,7 @@ $('btnImport').onclick = () => $('fileInput').click();
 $('fileInput').onchange = async (ev) => {
   const f = ev.target.files[0];
   ev.target.value = '';
+  closeSheet('settingsSheet');
   if (f) importXlsx(f).catch(() => toast('No se pudo leer el archivo'));
 };
 
