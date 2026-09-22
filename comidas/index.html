@@ -16,10 +16,16 @@
     --accent: #16a34a; --accent-soft: #dcfce7; --danger: #dc2626; --border: #e7e5e4;
   }
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
       --bg: #0c0a09; --card: #1c1917; --text: #fafaf9; --muted: #a8a29e;
       --accent: #22c55e; --accent-soft: #14532d; --danger: #f87171; --border: #292524;
     }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0c0a09; --card: #1c1917; --text: #fafaf9; --muted: #a8a29e;
+    --accent: #22c55e; --accent-soft: #14532d; --danger: #f87171; --border: #292524;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
@@ -72,7 +78,15 @@
     opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90%;
   }
   .toast.show { opacity: 1; }
-  .hidden { display: none; }
+  .hidden, [hidden] { display: none !important; }
+  .btn.danger { background: var(--danger); }
+  .btn:focus-visible, .chips button:focus-visible, .icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .overlay {
+    position: fixed; inset: 0; background: rgb(0 0 0 / .45); display: flex; align-items: flex-end;
+    padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 16px); z-index: 10;
+  }
+  .overlay .card { width: 100%; max-width: 480px; margin: 0 auto; }
+  .overlay .btn { margin-top: 10px; }
   .stars button { font-size: 24px; background: none; border: 0; padding: 0 4px; opacity: .3; }
   .stars button.on { opacity: 1; }
 </style>
@@ -161,6 +175,13 @@
     <button class="btn secondary" type="button" id="btnWipe" style="color:var(--danger)">Borrar todos los datos</button>
   </div>
 </section>
+
+<div class="overlay" id="dialog" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="dialogMsg">
+    <p id="dialogMsg" style="margin:0 0 6px;font-weight:600"></p>
+    <div id="dialogActions"></div>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 

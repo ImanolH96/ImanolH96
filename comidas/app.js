@@ -265,8 +265,8 @@ function startEdit(id) {
   $('formTitle').scrollIntoView({ behavior: 'smooth' });
 }
 
-function remove(id) {
-  if (!confirm('¿Borrar este registro?')) return;
+async function remove(id) {
+  if (await ask('¿Borrar este registro?', [['Borrar', 'ok', 'danger']]) !== 'ok') return;
   state.entries = state.entries.filter((e) => e.id !== id);
   persist();
   if (editingId === id) resetForm(); else render();
@@ -324,8 +324,9 @@ $('btnSaveSettings').onclick = () => {
   toast('Ajustes guardados');
 };
 
-$('btnWipe').onclick = () => {
-  if (!confirm('¿Borrar TODOS los registros? Exportá un Excel antes si querés conservarlos.')) return;
+$('btnWipe').onclick = async () => {
+  const msg = '¿Borrar TODOS los registros? Exportá un Excel antes si querés conservarlos.';
+  if (await ask(msg, [['Borrar todo', 'ok', 'danger']]) !== 'ok') return;
   state.entries = [];
   persist();
   resetForm();
@@ -441,10 +442,12 @@ async function importXlsx(file) {
     });
   }
   if (!imported.length) { toast('No encontré filas válidas en el archivo'); return; }
-  const replace = confirm(
-    `Encontré ${imported.length} registros.\n\nAceptar = reemplazar todo lo actual\nCancelar = combinar con lo actual`
-  );
-  if (replace) {
+  const choice = await ask(`Encontré ${imported.length} registros en el Excel.`, [
+    ['Combinar con lo actual', 'merge'],
+    ['Reemplazar todo', 'replace', 'danger'],
+  ]);
+  if (!choice) return;
+  if (choice === 'replace') {
     state.entries = imported;
   } else {
     const byId = new Map(state.entries.map((e) => [e.id, e]));
@@ -465,6 +468,33 @@ $('fileInput').onchange = async (ev) => {
 };
 
 // ---------- misc ----------
+
+// In-page confirmation dialog (native confirm() is unreliable in embedded views).
+// actions: [label, value, variant?]; resolves to the chosen value, or null on cancel.
+function ask(message, actions) {
+  return new Promise((resolve) => {
+    const dlg = $('dialog');
+    $('dialogMsg').textContent = message;
+    const box = $('dialogActions');
+    box.innerHTML = '';
+    const close = (v) => { dlg.hidden = true; resolve(v); };
+    for (const [label, value, variant] of actions) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn' + (variant === 'danger' ? ' danger' : '');
+      b.textContent = label;
+      b.onclick = () => close(value);
+      box.appendChild(b);
+    }
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'btn secondary';
+    cancel.textContent = 'Cancelar';
+    cancel.onclick = () => close(null);
+    box.appendChild(cancel);
+    dlg.hidden = false;
+  });
+}
 
 let toastTimer;
 function toast(msg) {
