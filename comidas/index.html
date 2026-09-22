@@ -31,7 +31,8 @@
     --alcohol-deep: #93224a;
     --postre: #f7a8cb;     /* strawberry milk */
     --postre-deep: #c06d93;
-    --over: #ff7a6b;
+    --over: #ff7a6b;       /* status: te pasaste */
+    --good: #34d3c0;       /* status: limpia / vas bien */
     --font: "Bricolage", ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -58,7 +59,23 @@
     font-variant-numeric: tabular-nums; letter-spacing: -0.02em; text-wrap: balance;
   }
   .week-left small { display: block; font-size: 17px; font-weight: 500; letter-spacing: 0; margin-top: 6px; }
-  .week-left.over { color: var(--over); }
+  .week-left.s-over { color: var(--over); }
+  .week-left.s-clean, .week-left.s-good { color: var(--good); }
+  .week-status { margin-top: 10px; }
+  .status {
+    --st: var(--good);
+    display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px 4px 4px; border-radius: 999px;
+    background: color-mix(in srgb, var(--st) 20%, transparent); color: var(--paper);
+    font-size: 14px; font-weight: 700; line-height: 1.2;
+  }
+  .status i, .wk .st {
+    width: 22px; height: 22px; border-radius: 50%; background: var(--st); color: var(--ink-deep);
+    display: inline-grid; place-items: center; font-style: normal; font-size: 12px; font-weight: 800; flex: none;
+  }
+  .s-clean, .s-good { --st: var(--good); }
+  .s-limit { --st: var(--paper); }
+  .s-over { --st: var(--over); }
+  .punch.s-clean .slot, .punch.s-good .slot { stroke: color-mix(in srgb, var(--good) 60%, var(--line)); }
   .gear { background: none; border: 0; padding: 8px; margin: -4px -8px 0 0; color: var(--muted); }
   .gear svg { display: block; width: 26px; height: 26px; }
   .punch { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
@@ -184,16 +201,18 @@
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .weeks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
   .wk {
-    width: 100%; display: grid; grid-template-columns: 10.5em 1fr 3.2em; align-items: center; gap: 12px;
+    width: 100%; display: grid; grid-template-columns: 22px 10.5em 1fr 3.2em; align-items: center; gap: 10px;
     border: 1.5px solid transparent; background: var(--panel); border-radius: 14px; padding: 10px 12px;
-    text-align: left; font-size: 15px;
+    text-align: left; font-size: 14px;
   }
   .wk.on { border-color: var(--paper); }
   .wkbar { height: 8px; border-radius: 4px; background: var(--ink); overflow: hidden; }
-  .wkbar i { display: block; height: 100%; background: var(--comida); border-radius: 4px; }
-  .wkbar i.over { background: var(--over); }
+  .wkbar i { display: block; height: 100%; background: var(--st); border-radius: 4px; }
+  .wk.s-clean { background: color-mix(in srgb, var(--good) 14%, var(--panel)); }
+  .wk.s-over { background: color-mix(in srgb, var(--over) 14%, var(--panel)); }
   .wkval { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .wkval.over { color: var(--over); }
+  #chart .stdot { fill: var(--st); }
+  #chart .sticon { fill: var(--ink-deep); font-size: 10px; font-weight: 800; font-family: var(--font); pointer-events: none; }
 
   .foot { display: flex; gap: 8px; flex-wrap: wrap; }
   .ghost {
@@ -278,6 +297,7 @@
         <button class="nav" id="wkNext" type="button" aria-label="Semana siguiente"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
       </div>
       <p class="week-left" id="weekLeft">2<small>comidas libres disponibles</small></p>
+      <div class="week-status" id="weekStatus"></div>
       <div class="punch" id="punch" aria-hidden="true"></div>
       <button class="today-link" id="wkToday" type="button" hidden>Volver a esta semana</button>
     </div>
@@ -315,6 +335,7 @@
       <button class="nav" id="moNext" type="button" aria-label="Mes siguiente"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
     </div>
     <p class="month-total" id="monthTotal"></p>
+    <div id="monthStatus"></div>
     <div class="seg chart-switch" id="chartSwitch" role="group" aria-label="Tipo de gráfica"></div>
     <figure class="chart-wrap">
       <svg id="chart" role="img" aria-label="Gráfica de comidas libres del mes"></svg>

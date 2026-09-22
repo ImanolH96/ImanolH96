@@ -319,6 +319,23 @@ function thirdsBetween(from, to) {
   return state.entries.filter((e) => e.fecha >= from && e.fecha <= to).reduce((n, e) => n + thirdsOf(e), 0);
 }
 
+// ---------- status: how a week / month is going ----------
+
+// used and quota in thirds. Always shown with an icon and a label, never color alone.
+function weekStatus(used, quota, finished) {
+  if (!used) return { key: 'clean', icon: '★', label: 'Semana limpia' };
+  if (used < quota) return { key: 'good', icon: '✓', label: finished ? 'Dentro del plan' : 'Vas bien' };
+  if (used === quota) return { key: 'limit', icon: '=', label: 'Al límite' };
+  return { key: 'over', icon: '!', label: `Te pasaste por ${fmtThirds(used - quota)}` };
+}
+
+function statusPill(st) {
+  const p = document.createElement('span');
+  p.className = `status s-${st.key}`;
+  p.append(Object.assign(document.createElement('i'), { textContent: st.icon, ariaHidden: 'true' }), st.label);
+  return p;
+}
+
 function renderWeek() {
   const [from, to] = viewedWeek();
   const week = state.entries
@@ -337,9 +354,13 @@ function renderWeek() {
     : `Semana del ${range}`;
   $('wkNext').disabled = current;
   $('wkToday').hidden = current;
+  const st = weekStatus(used, quota, !current);
   const big = $('weekLeft');
-  big.classList.toggle('over', left < 0);
+  big.className = `week-left s-${st.key}`;
   big.innerHTML = '';
+  $('weekStatus').innerHTML = '';
+  $('weekStatus').appendChild(statusPill(st));
+  $('punch').className = `punch s-${st.key}`;
   if (!current) {
     big.append(fmtThirds(used), Object.assign(document.createElement('small'), {
       textContent: left < 0 ? `de ${quota / 3} permitidas, te pasaste por ${fmtThirds(-left)}` : `de ${quota / 3} comidas libres usadas`,
@@ -454,11 +475,22 @@ function renderMonth() {
   const counts = PARTS.map(([k, , icon]) => `${icon} ${inMonth.filter((e) => e.partes[k]).length}`).join('   ');
   $('monthTotal').innerHTML = '';
   const allowed = Math.round(((Number(state.settings.quota) || 0) * new Date(y, m + 1, 0).getDate() / 7) * 3);
+  // compare against what the month allows up to today (whole month once it's over)
+  const isCur = y === now.getFullYear() && m === now.getMonth();
+  const daysSoFar = isCur ? now.getDate() : new Date(y, m + 1, 0).getDate();
+  const allowedSoFar = Math.round(((Number(state.settings.quota) || 0) * daysSoFar / 7) * 3);
+  let mst;
+  if (!total) mst = { key: 'clean', icon: '★', label: 'Mes limpio' };
+  else if (total > allowed) mst = { key: 'over', icon: '!', label: `Te pasaste por ${fmtThirds(total - allowed)}` };
+  else if (total > allowedSoFar) mst = { key: 'limit', icon: '=', label: 'Por encima del ritmo' };
+  else mst = { key: 'good', icon: '✓', label: isCur ? 'Vas bien' : 'Dentro del plan' };
   $('monthTotal').append(
     Object.assign(document.createElement('b'), { textContent: fmtThirds(total) }),
     ` de ${fmtThirds(allowed)} comidas libres en el mes`,
     Object.assign(document.createElement('span'), { textContent: counts }),
   );
+  $('monthStatus').innerHTML = '';
+  $('monthStatus').appendChild(statusPill(mst));
 
   renderChart(y, m, inMonth);
 
@@ -474,21 +506,22 @@ function renderMonth() {
     const li = document.createElement('li');
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'wk' + (offset === weekOffset ? ' on' : '');
+    const st = weekStatus(used, quota, to < today);
+    b.className = `wk s-${st.key}` + (offset === weekOffset ? ' on' : '');
     b.onclick = () => { weekOffset = offset; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    const icon = Object.assign(document.createElement('i'), { className: 'st', textContent: st.icon, ariaHidden: 'true' });
     const label = Object.assign(document.createElement('span'), { textContent: weekRangeLabel(from, to, true) });
     const bar = document.createElement('span');
     bar.className = 'wkbar';
     const fill = document.createElement('i');
     fill.style.width = `${quota ? Math.min(100, (used / quota) * 100) : used ? 100 : 0}%`;
-    if (used > quota) fill.className = 'over';
     bar.appendChild(fill);
     const val = Object.assign(document.createElement('span'), {
-      className: 'wkval' + (used > quota ? ' over' : ''),
+      className: 'wkval',
       textContent: `${fmtThirds(used)} / ${quota / 3}`,
     });
-    b.append(label, bar, val);
-    b.setAttribute('aria-label', `Semana del ${weekRangeLabel(from, to)}: ${fmtThirds(used)} de ${quota / 3}. Ver semana`);
+    b.append(icon, label, bar, val);
+    b.setAttribute('aria-label', `Semana del ${weekRangeLabel(from, to)}: ${fmtThirds(used)} de ${quota / 3}, ${st.label}. Ver semana`);
     li.appendChild(b);
     ul.appendChild(li);
     const next = parseDate(from); next.setDate(next.getDate() + 7);
@@ -700,7 +733,7 @@ function renderWeekly(y, m) {
     const t = new Date(n); t.setDate(t.getDate() + 6); to = isoDate(t);
   }
   const quota = Number(state.settings.quota) || 0;
-  const W = 340, H = 190, L = 26, R = 42, T = 18, B = 26;
+  const W = 340, H = 210, L = 26, R = 42, T = 44, B = 26;
   const maxY = Math.max(1, Math.ceil(Math.max(quota, ...weeks.map((w) => (w.c.comida + w.c.alcohol + w.c.postre) / 3))));
   const yv = (v) => T + (1 - v / maxY) * (H - T - B);
   const svg = $('chart');
@@ -729,6 +762,11 @@ function renderWeekly(y, m) {
     el('rect', { x: cx - band / 2, y: T, width: band, height: H - T - B, class: 'hit' }, g);
     const total = w.c.comida + w.c.alcohol + w.c.postre;
     el('text', { x: cx, y: yv(acc) - 6, class: 'endlabel', 'text-anchor': 'middle' }, svg).textContent = fmtThirds(total);
+    const st = weekStatus(total, quota * 3, w.to < today);
+    const by = yv(acc) - 30;
+    el('circle', { cx, cy: by, r: 8, class: `stdot s-${st.key}` }, svg);
+    el('text', { x: cx, y: by + 4, class: 'sticon', 'text-anchor': 'middle' }, svg).textContent = st.icon;
+    g.setAttribute('data-tip', g.getAttribute('data-tip') + '\n' + st.label);
     const f = parseDate(w.from), t = parseDate(w.to);
     el('text', { x: cx, y: H - 8, class: 'tick', 'text-anchor': 'middle' }, svg).textContent = `${f.getDate()}–${t.getDate()}`;
   });
