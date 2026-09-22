@@ -5,7 +5,7 @@ Todo corre en el dispositivo: sin servidor, sin cuentas, sin backend. Funciona o
 
 ## Qué hace
 
-- **Botonera de un toque**: 🍔 Comida fuera del plan, 🍷 Alcohol y 🍰 Postre. Cada tecla suma ⅓; las tres juntas son una comida libre.
+- **Botonera de un toque**: 🍔 Comida fuera del plan, 🍷 Alcohol y 🍰 Dulce. Cada tecla suma ⅓; las tres juntas son una comida libre.
 - Usa la fecha de hoy y detecta el momento por la hora (editable en ⚙️):
   Desayuno 05:00–11:00 · Almuerzo 11:00–15:30 · Merienda 15:30–19:00 · Cena 19:00–05:00.
   Se puede cambiar a Ayer / otro día u otro momento antes de tocar.
@@ -14,8 +14,8 @@ Todo corre en el dispositivo: sin servidor, sin cuentas, sin backend. Funciona o
 - Estado con color, ícono y texto en la semana, el mes, el listado de semanas y la gráfica semanal: ★ Semana limpia (0 comidas libres) y ✓ Vas bien / Dentro del plan en verde, = Al límite en blanco, ! Te pasaste en rojo. El mes se compara con lo permitido hasta hoy.
 - Navegación por semana con las flechas ‹ ›: la tarjeta y los registros muestran la semana elegida ("Volver a esta semana" regresa).
 - Resumen del mes con sus propias flechas y un selector de gráficas (tocá la gráfica para ver el detalle):
-  **Acumulado** día a día contra el límite (tu cupo semanal repartido por día), **Por semana** (columnas con comida / alcohol / postre contra el cupo), **Momentos** (en qué momento del día caen) y **Calendario** (mapa de calor del mes).
-  Debajo: total de comidas libres, cuántas veces hubo comida, alcohol y postre, y una barra por semana (tocándola vas a esa semana). El Excel suma la hoja `Resumen mensual`.
+  **Acumulado** día a día contra el límite (tu cupo semanal repartido por día), **Por semana** (columnas con comida / alcohol / dulce contra el cupo), **Momentos** (en qué momento del día caen) y **Calendario** (mapa de calor del mes).
+  Debajo: total de comidas libres, cuántas veces hubo comida, alcohol y dulce, y una barra por semana (tocándola vas a esa semana). El Excel suma la hoja `Resumen mensual`.
 - Detalle opcional: tocando un registro se puede agregar qué fue y notas, cambiar día/hora/partes o borrarlo.
 - **Exportar a Excel (.xlsx)** con dos hojas: `Comidas` (una columna Sí/No por parte y el valor, ej. 0.67) y `Resumen semanal`. En iPhone abre el menú Compartir → "Guardar en Archivos", WhatsApp, mail, etc.
 - **Importar desde Excel**: lee la hoja `Comidas` (podés editarla en Numbers/Excel y volver a cargarla). Te deja reemplazar todo o combinar.

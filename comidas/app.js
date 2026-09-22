@@ -6,7 +6,7 @@ const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 const PARTS = [
   ['comida', 'Comida fuera del plan', '🍔'],
   ['alcohol', 'Alcohol', '🍷'],
-  ['postre', 'Postre', '🍰'],
+  ['postre', 'Dulce', '🍰'],   // key stays 'postre' so saved data keeps working
 ];
 // Start time of each auto-detected meal; before breakfast counts as dinner (late night).
 const DEFAULT_RANGES = { Desayuno: '05:00', Almuerzo: '11:00', Merienda: '15:30', Cena: '19:00' };
@@ -19,7 +19,7 @@ const COLUMNS = [
   ['lugar', 'Dónde / con quién'],
   ['comida', 'Comida fuera del plan'],
   ['alcohol', 'Alcohol'],
-  ['postre', 'Postre'],
+  ['postre', 'Dulce'],
   ['valor', 'Valor (comidas libres)'],
   ['disfrute', 'Disfrute (1-5)'],
   ['notas', 'Notas'],
@@ -240,7 +240,7 @@ function snapshot() {
 function tap(part) {
   const fecha = currentDate();
   const momento = currentMeal();
-  const noun = { comida: 'Comida fuera del plan', alcohol: 'Alcohol', postre: 'Postre' }[part];
+  const noun = { comida: 'Comida fuera del plan', alcohol: 'Alcohol', postre: 'Dulce' }[part];
   const where = `${withArticle(momento)} ${dayLabel(fecha)}`;
   const occ = occasion(fecha, momento);
   if (occ && occ.partes[part]) {
@@ -649,7 +649,7 @@ const VIEWS = [
 ];
 const CAPTIONS = {
   acum: 'Acumulado del mes. La línea fina es el límite según tus comidas libres por semana.',
-  semanas: 'Cada columna es una semana entera, dividida en comida, alcohol y postre. La línea es tu cupo semanal.',
+  semanas: 'Cada columna es una semana entera, dividida en comida, alcohol y dulce. La línea es tu cupo semanal.',
   momentos: 'En qué momento del día caen las comidas libres del mes.',
   calendario: 'Cada día del mes; más intenso es más comida libre ese día.',
 };
@@ -772,7 +772,7 @@ function renderWeekly(y, m) {
   });
   el('line', { x1: L, x2: W - R + 6, y1: yv(quota), y2: yv(quota), class: 'pace' }, svg);
   el('text', { x: W - R + 8, y: yv(quota) + 4, class: 'tick' }, svg).textContent = 'cupo';
-  tableFrom(['Semana', 'Comida', 'Alcohol', 'Postre', 'Total'],
+  tableFrom(['Semana', 'Comida', 'Alcohol', 'Dulce', 'Total'],
     weeks.map((w) => [weekRangeLabel(w.from, w.to, true), w.c.comida, w.c.alcohol, w.c.postre, fmtThirds(w.c.comida + w.c.alcohol + w.c.postre)]), 'Comidas libres por semana');
 }
 
@@ -803,7 +803,7 @@ function renderMoments(y, m, inMonth) {
     const total = r.c.comida + r.c.alcohol + r.c.postre;
     el('text', { x: xv(acc) + 8, y: cy + 4, class: total ? 'endlabel' : 'tick' }, svg).textContent = total ? fmtThirds(total) : '0';
   });
-  tableFrom(['Momento', 'Comida', 'Alcohol', 'Postre', 'Total'],
+  tableFrom(['Momento', 'Comida', 'Alcohol', 'Dulce', 'Total'],
     rows.map((r) => [r.meal, r.c.comida, r.c.alcohol, r.c.postre, fmtThirds(r.c.comida + r.c.alcohol + r.c.postre)]), 'Comidas libres por momento del día');
 }
 
@@ -845,7 +845,7 @@ function renderCalendar(y, m, inMonth) {
     });
     if (t) rows.push([d, c.comida, c.alcohol, c.postre, fmtThirds(t)]);
   }
-  tableFrom(['Día', 'Comida', 'Alcohol', 'Postre', 'Total'], rows, 'Comidas libres por día');
+  tableFrom(['Día', 'Comida', 'Alcohol', 'Dulce', 'Total'], rows, 'Comidas libres por día');
 }
 
 function tableFrom(head, rows, caption) {
@@ -945,7 +945,7 @@ function openEdit(id) {
 
 $('editForm').addEventListener('submit', (ev) => {
   ev.preventDefault();
-  if (!thirdsOf({ partes: editParts })) { toast('Marcá al menos comida, alcohol o postre'); return; }
+  if (!thirdsOf({ partes: editParts })) { toast('Marcá al menos comida, alcohol o dulce'); return; }
   const e = state.entries.find((x) => x.id === editingId);
   if (!e) return;
   Object.assign(e, {
@@ -1035,13 +1035,13 @@ async function exportXlsx() {
     'Semana desde': w,
     'Comidas fuera del plan': weeks[w].comida,
     'Alcohol': weeks[w].alcohol,
-    'Postre': weeks[w].postre,
+    'Dulce': weeks[w].postre,
     'Comidas libres': round2(weeks[w].thirds / 3),
     'Permitidas': quota,
     'Diferencia': round2(quota - weeks[w].thirds / 3),
   }));
   const ws2 = XLSX.utils.json_to_sheet(summary, {
-    header: ['Semana desde', 'Comidas fuera del plan', 'Alcohol', 'Postre', 'Comidas libres', 'Permitidas', 'Diferencia'],
+    header: ['Semana desde', 'Comidas fuera del plan', 'Alcohol', 'Dulce', 'Comidas libres', 'Permitidas', 'Diferencia'],
   });
 
   const months = {};
@@ -1055,9 +1055,9 @@ async function exportXlsx() {
     'Mes': k,
     'Comidas fuera del plan': months[k].comida,
     'Alcohol': months[k].alcohol,
-    'Postre': months[k].postre,
+    'Dulce': months[k].postre,
     'Comidas libres': round2(months[k].thirds / 3),
-  })), { header: ['Mes', 'Comidas fuera del plan', 'Alcohol', 'Postre', 'Comidas libres'] });
+  })), { header: ['Mes', 'Comidas fuera del plan', 'Alcohol', 'Dulce', 'Comidas libres'] });
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Comidas');
@@ -1103,6 +1103,8 @@ function cellToTime(v) {
 const yes = (v) => /^(s[ií]|si|x|1|true|verdadero)$/i.test(String(v).trim());
 
 function cellsToParts(row) {
+  // "Postre" was the column name before it was renamed to "Dulce"
+  if (!('Dulce' in row) && 'Postre' in row) row = { ...row, Dulce: row.Postre };
   const cols = PARTS.map(([k]) => COLUMNS.find(([c]) => c === k)[1]);
   // Spreadsheets without part columns (older exports) are full free meals.
   if (!cols.some((h) => h in row)) return { comida: true, alcohol: true, postre: true };
