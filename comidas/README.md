@@ -5,6 +5,8 @@ Todo corre en el dispositivo: sin servidor, sin cuentas, sin backend. Funciona o
 
 ## Qué hace
 
+En Registrar, una tarjeta con barra de progreso de la semana ("Usaste ⅔ de 2 comidas libres", marcas en cada comida libre y lo que excede el cupo en rojo).
+
 Tres pestañas abajo: **Registrar** (abre siempre en el día de hoy; se puede cambiar a ayer u otro día), **Semana** y **Mes**. Exportar/importar Excel está en ⚙️ Ajustes.
 
 - **Botonera de un toque**: 🍔 Comida fuera del plan, 🍷 Alcohol y 🍰 Dulce. Cada tecla suma ⅓; las tres juntas son una comida libre.
@@ -13,7 +15,7 @@ Tres pestañas abajo: **Registrar** (abre siempre en el día de hoy; se puede ca
   Se puede cambiar el momento con los botones, o el día con la fila de arriba: ‹ › de a un día, » vuelve a hoy, y el botón de calendario "Hoy ▾" abre la lista de días (se resalta cuando no es hoy).
 - Los toques del mismo momento y día se juntan en un solo registro (ej. cena con comida + alcohol = ⅔). Cada toque se puede deshacer.
 - Tarjeta semanal: un círculo de tres porciones por cada comida libre permitida (por defecto 2 por semana, configurable). Si te pasás aparecen círculos extra punteados.
-- Estado con color, ícono y texto en la semana, el mes, el listado de semanas y la gráfica semanal: ★ Semana limpia (0 comidas libres) y ✓ Vas bien / Dentro del plan en verde, = Al límite en blanco, ! Sobre el cupo / Por encima del límite en rojo. El mes se compara con lo permitido hasta hoy.
+- Estado con color, ícono y texto en la semana, el mes, el listado de semanas y la gráfica semanal: ★ Semana limpia (0 comidas libres) y ✓ Vas bien / Dentro del plan en verde, = Al límite en blanco, ! Por encima del cupo / del límite en rojo. El mes se compara con lo permitido hasta hoy.
 - Ajuste del mes (solo el mes actual): una frase con lo que queda del mes y cuánto por semana para cerrar en el plan (o, si ya estás por encima del límite, cuánto y cuándo arranca el mes nuevo), y una línea punteada en la gráfica Acumulado con el margen hasta fin de mes.
 - Navegación por semana con las flechas ‹ ›: la tarjeta y los registros muestran la semana elegida ("Volver a esta semana" regresa).
 - Resumen del mes con sus propias flechas y un selector de gráficas (tocá la gráfica para ver el detalle):

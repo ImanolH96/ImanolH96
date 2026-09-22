@@ -332,7 +332,28 @@ function weekStatus(used, quota, finished) {
   if (!used) return { key: 'clean', icon: '★', label: 'Semana limpia' };
   if (used < quota) return { key: 'good', icon: '✓', label: finished ? 'Dentro del plan' : 'Vas bien' };
   if (used === quota) return { key: 'limit', icon: '=', label: 'Al límite' };
-  return { key: 'over', icon: '!', label: `${fmtThirds(used - quota)} sobre el cupo` };
+  return { key: 'over', icon: '!', label: 'Por encima del cupo' };
+}
+
+// "1 comida libre", "2 comidas libres"
+const mealsWord = (n) => `${n} ${n === 1 ? 'comida libre' : 'comidas libres'}`;
+
+// Progress bar in thirds: a tick at every whole free meal, a marker at the quota,
+// and the part above the quota drawn in the "over" color.
+function progressBar(used, quota) {
+  const max = Math.max(quota, used, 3);
+  const bar = document.createElement('span');
+  bar.className = 'pbar';
+  const pct = (v) => `${(v / max) * 100}%`;
+  const within = Math.min(used, quota);
+  bar.appendChild(Object.assign(document.createElement('i'), { className: 'fill', style: `width:${pct(within)}` }));
+  if (used > quota) {
+    bar.appendChild(Object.assign(document.createElement('i'), { className: 'fill extra', style: `left:${pct(quota)};width:${pct(used - quota)}` }));
+  }
+  for (let v = 3; v < max; v += 3) {
+    bar.appendChild(Object.assign(document.createElement('i'), { className: v === quota && used > quota ? 'tick cupo' : 'tick', style: `left:${pct(v)}` }));
+  }
+  return bar;
 }
 
 function statusPill(st) {
@@ -369,15 +390,15 @@ function renderWeek() {
   $('punch').className = `punch s-${st.key}`;
   if (!current) {
     big.append(fmtThirds(used), Object.assign(document.createElement('small'), {
-      textContent: left < 0 ? `de ${quota / 3} comidas libres de la semana` : `de ${quota / 3} comidas libres usadas`,
+      textContent: left < 0 ? `de ${mealsWord(quota / 3)} de la semana` : `de ${mealsWord(quota / 3)} usadas`,
     }));
   } else if (left >= 0) {
     big.append(fmtThirds(left), Object.assign(document.createElement('small'), {
       textContent: left === 3 ? 'comida libre disponible' : left > 0 && left < 3 ? 'de comida libre disponible' : 'comidas libres disponibles',
     }));
   } else {
-    big.append('+' + fmtThirds(-left), Object.assign(document.createElement('small'), {
-      textContent: 'sobre el cupo de la semana',
+    big.append(fmtThirds(used), Object.assign(document.createElement('small'), {
+      textContent: `de ${mealsWord(quota / 3)} de la semana`,
     }));
   }
 
@@ -477,14 +498,15 @@ function renderToday() {
   const st = weekStatus(used, quota, false);
   const box = $('todaySummary');
   box.innerHTML = '';
-  const t = document.createElement('span');
-  t.className = 't';
-  t.append(Object.assign(document.createElement('small'), { textContent: 'Esta semana' }),
-    Object.assign(document.createElement('b'), {
-      textContent: left >= 0 ? `Te quedan ${fmtThirds(left)} de ${quota / 3}` : `${fmtThirds(used)} de ${quota / 3}`,
-    }));
-  box.append(t, statusPill(st));
-  box.setAttribute('aria-label', `Esta semana: ${t.lastChild.textContent}, ${st.label}. Ver semana`);
+  box.className = `today-sum s-${st.key}`;
+  const head = document.createElement('span');
+  head.className = 'head';
+  head.append(Object.assign(document.createElement('small'), { textContent: 'Esta semana' }), statusPill(st));
+  const text = `Usaste ${fmtThirds(used)} de ${mealsWord(quota / 3)}`;
+  const note = left > 0 ? `Te quedan ${fmtThirds(left)}` : left === 0 ? 'Cupo completo' : `${fmtThirds(-left)} por encima del cupo`;
+  box.append(head, Object.assign(document.createElement('b'), { textContent: text }), progressBar(used, quota),
+    Object.assign(document.createElement('small'), { className: 'note', textContent: note }));
+  box.setAttribute('aria-label', `Esta semana: ${text}. ${note}. ${st.label}. Ver semana`);
 
   const fecha = currentDate();
   const list = $('dayList');

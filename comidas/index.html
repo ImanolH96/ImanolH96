@@ -54,13 +54,21 @@
   .appbar .gear { margin: 0 -8px 0 0; }
 
   .today-sum {
-    width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    border: 0; border-radius: 16px; background: var(--panel); padding: 12px 14px; text-align: left;
+    width: 100%; display: flex; flex-direction: column; gap: 8px;
+    border: 0; border-radius: 16px; background: var(--panel); padding: 12px 14px 14px; text-align: left;
   }
-  .today-sum .t { display: flex; flex-direction: column; min-width: 0; }
-  .today-sum .t small { color: var(--muted); font-size: 13px; }
-  .today-sum .t b { font-size: 17px; font-variant-numeric: tabular-nums; }
-  .today-sum .status { flex: none; }
+  .today-sum .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .today-sum .head small { color: var(--muted); font-size: 13px; }
+  .today-sum .head .status { font-size: 13px; padding-block: 3px; }
+  .today-sum .head .status i { width: 20px; height: 20px; }
+  .today-sum b { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .today-sum .note { align-self: flex-end; margin-top: -2px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .pbar { position: relative; display: block; height: 10px; border-radius: 5px; background: var(--ink); overflow: hidden; }
+  .pbar .fill { position: absolute; top: 0; bottom: 0; left: 0; background: var(--st, var(--good)); }
+  .pbar .fill.extra { background: var(--over); }
+  .s-over .pbar .fill:not(.extra) { background: var(--muted); }
+  .pbar .tick { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--panel); }
+  .pbar .tick.cupo { width: 3px; background: var(--paper); }
 
   .tabbar {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 15;
