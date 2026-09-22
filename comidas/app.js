@@ -147,7 +147,7 @@ function renderWhen() {
     : parseDate(fecha).toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/^\w/, (c) => c.toUpperCase());
   $('dayBtnText').textContent = short;
   $('dayNext').disabled = !away;
-  $('dayToday').disabled = !away;
+  $('dayToday').hidden = !away;
   $('dayPill').classList.toggle('away', away);
   btn.setAttribute('aria-label', `Día: ${dayLabel(fecha).replace(/^de(l)? /, '')}. Cambiar día`);
 
@@ -203,7 +203,7 @@ $('dayBtn').onclick = () => {
 };
 $('dayUse').onclick = () => useDay($('dayPick').value);
 
-// ‹ › step one day at a time (never past today); » jumps to today
+// ‹ › step one day at a time (never past today); "Ir a hoy" jumps back
 function stepDay(delta) {
   const d = parseDate(currentDate());
   d.setDate(d.getDate() + delta);
