@@ -5,13 +5,14 @@ Todo corre en el dispositivo: sin servidor, sin cuentas, sin backend. Funciona o
 
 ## Qué hace
 
-- Registrar comida libre: fecha, hora, momento (desayuno/almuerzo/…), qué comiste, dónde/con quién, disfrute (1–5) y notas.
-- Por defecto usa la fecha y hora actuales y detecta el momento según la hora (editable en ⚙️):
-  Desayuno 05:00–11:00 · Almuerzo 11:00–15:30 · Merienda 15:30–19:00 · Cena 19:00–05:00. Si elegís el momento a mano, se respeta.
-- Conteo parcial: una comida libre completa = 🍔 comida fuera del plan + 🍷 alcohol + 🍰 postre. Cada parte suma ⅓.
-- Contador semanal en tercios contra tu cupo (configurable en ⚙️, por defecto 2 por semana; semana de lunes o domingo), con el desglose por parte.
-- Historial con editar y borrar.
-- **Exportar a Excel (.xlsx)** con dos hojas: `Comidas` (una columna Sí/No por parte y el valor, ej. 0.67) y `Resumen semanal`. En iPhone abre el menú Compartir → "Guardar en Archivos" (iCloud Drive o En mi iPhone), WhatsApp, mail, etc.
+- **Botonera de un toque**: 🍔 Comida fuera del plan, 🍷 Alcohol y 🍰 Postre. Cada tecla suma ⅓; las tres juntas son una comida libre.
+- Usa la fecha de hoy y detecta el momento por la hora (editable en ⚙️):
+  Desayuno 05:00–11:00 · Almuerzo 11:00–15:30 · Merienda 15:30–19:00 · Cena 19:00–05:00.
+  Se puede cambiar a Ayer / otro día u otro momento antes de tocar.
+- Los toques del mismo momento y día se juntan en un solo registro (ej. cena con comida + alcohol = ⅔). Cada toque se puede deshacer.
+- Tarjeta semanal: un círculo de tres porciones por cada comida libre permitida (por defecto 2 por semana, configurable). Si te pasás aparecen círculos extra punteados.
+- Detalle opcional: tocando un registro se puede agregar qué fue y notas, cambiar día/hora/partes o borrarlo.
+- **Exportar a Excel (.xlsx)** con dos hojas: `Comidas` (una columna Sí/No por parte y el valor, ej. 0.67) y `Resumen semanal`. En iPhone abre el menú Compartir → "Guardar en Archivos", WhatsApp, mail, etc.
 - **Importar desde Excel**: lee la hoja `Comidas` (podés editarla en Numbers/Excel y volver a cargarla). Te deja reemplazar todo o combinar.
 
 ## Cómo instalarla en el iPhone
@@ -35,5 +36,6 @@ Hace falta servirla por HTTPS **una sola vez** para instalarla; después queda c
 - `index.html` – interfaz y estilos
 - `app.js` – lógica, almacenamiento, exportar/importar Excel
 - `vendor/xlsx.mini.min.js` – SheetJS 0.18.5 (incluida localmente para funcionar offline)
+- `fonts/bricolage.woff2` – tipografía Bricolage Grotesque (OFL), local para funcionar offline
 - `sw.js` – service worker (cache offline). Si cambiás archivos, subí la versión de `CACHE` para que el iPhone baje la nueva.
 - `manifest.webmanifest`, `icon-*.png` – instalación en pantalla de inicio

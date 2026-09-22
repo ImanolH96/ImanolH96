@@ -4,205 +4,293 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Comidas libres">
-<meta name="theme-color" content="#16a34a">
+<meta name="theme-color" content="#1b2656">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <title>Comidas libres</title>
 <style>
+  @font-face {
+    font-family: "Bricolage";
+    src: url("fonts/bricolage.woff2") format("woff2");
+    font-weight: 200 800;
+    font-display: swap;
+  }
   :root {
-    --bg: #f5f5f4; --card: #fff; --text: #1c1917; --muted: #78716c;
-    --accent: #16a34a; --accent-soft: #dcfce7; --danger: #dc2626; --border: #e7e5e4;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      color-scheme: dark;
-      --bg: #0c0a09; --card: #1c1917; --text: #fafaf9; --muted: #a8a29e;
-      --accent: #22c55e; --accent-soft: #14532d; --danger: #f87171; --border: #292524;
-    }
-  }
-  :root[data-theme="dark"] {
     color-scheme: dark;
-    --bg: #0c0a09; --card: #1c1917; --text: #fafaf9; --muted: #a8a29e;
-    --accent: #22c55e; --accent-soft: #14532d; --danger: #f87171; --border: #292524;
+    --ink: #1b2656;        /* cobalt ground */
+    --ink-deep: #121a3d;   /* key shadows, sheet backdrop */
+    --panel: #26336b;      /* sheets, inputs */
+    --line: #3a4884;
+    --paper: #f4f2ff;      /* main text */
+    --muted: #a3acd6;
+    --comida: #f4b63f;     /* mustard */
+    --comida-deep: #b9811a;
+    --alcohol: #d84a78;    /* wine */
+    --alcohol-deep: #93224a;
+    --postre: #f7a8cb;     /* strawberry milk */
+    --postre-deep: #c06d93;
+    --over: #ff7a6b;
+    --font: "Bricolage", ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { background: var(--ink); }
   body {
-    margin: 0; background: var(--bg); color: var(--text);
-    font: 16px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
-    padding: env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 24px);
+    margin: 0; min-height: 100%;
+    background: var(--ink); color: var(--paper);
+    font: 400 16px/1.4 var(--font);
+    padding: env(safe-area-inset-top, 0px) 16px calc(env(safe-area-inset-bottom, 0px) + 32px);
+    -webkit-font-smoothing: antialiased;
   }
-  header { display: flex; align-items: center; justify-content: space-between; padding: 16px 0 8px; }
-  h1 { font-size: 28px; margin: 0; }
-  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 24px 4px 8px; }
-  .card { background: var(--card); border-radius: 14px; padding: 16px; border: 1px solid var(--border); }
-  .quota { display: flex; align-items: center; gap: 16px; }
-  .quota .big { flex: none; font-size: 40px; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .quota .big.over { color: var(--danger); }
-  .bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-top: 8px; }
-  .bar > div { height: 100%; background: var(--accent); transition: width .3s; }
-  .bar > div.over { background: var(--danger); }
-  label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 4px; }
-  input, select, textarea, button { font: inherit; color: inherit; }
-  input, select, textarea {
-    display: block; width: 100%; min-width: 0; max-width: 100%; min-height: 44px; margin: 0;
-    font-size: 16px; /* 16px stops iOS from zooming on focus */
-    color: var(--text); background: var(--bg);
-    border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+  main { max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+  button { font: inherit; color: inherit; -webkit-appearance: none; appearance: none; cursor: pointer; }
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 3px solid var(--paper); outline-offset: 2px;
+  }
+  .hidden, [hidden] { display: none !important; }
+
+  /* ---------- top: week punch card ---------- */
+  .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding-top: 16px; }
+  .week-title { margin: 0; font-size: 15px; font-weight: 500; color: var(--muted); }
+  .week-left {
+    margin: 2px 0 0; font-size: 44px; line-height: 1; font-weight: 800;
+    font-variant-numeric: tabular-nums; letter-spacing: -0.02em; text-wrap: balance;
+  }
+  .week-left small { display: block; font-size: 17px; font-weight: 500; letter-spacing: 0; margin-top: 6px; }
+  .week-left.over { color: var(--over); }
+  .gear { background: none; border: 0; padding: 8px; margin: -4px -8px 0 0; color: var(--muted); }
+  .gear svg { display: block; width: 26px; height: 26px; }
+  .punch { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+  .punch svg { width: 48px; height: 48px; display: block; }
+  .punch .slot { fill: none; stroke: var(--line); stroke-width: 2; }
+  .punch .slot.extra { stroke: var(--over); stroke-dasharray: 4 3; }
+  .punch .divider { stroke: var(--ink); stroke-width: 2.5; }
+  .punch .wedge.fresh { animation: stamp .45s cubic-bezier(.2, 1.6, .4, 1); transform-origin: 24px 24px; }
+  @keyframes stamp { from { transform: scale(.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  /* ---------- context: when ---------- */
+  .when { display: flex; flex-direction: column; gap: 10px; }
+  .when-line { margin: 0; font-size: 22px; font-weight: 700; }
+  .when-line span { color: var(--muted); font-weight: 500; }
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seg button, .seg label {
+    position: relative; border: 1.5px solid var(--line); background: transparent; color: var(--paper);
+    border-radius: 999px; padding: 7px 13px; font-size: 15px; line-height: 1.2; font-weight: 500;
+  }
+  .seg button[aria-pressed="true"], .seg label.on { background: var(--paper); color: var(--ink); border-color: var(--paper); }
+  .seg label input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; }
+
+  /* ---------- the keypad ---------- */
+  .pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .key {
+    --c: var(--comida); --d: var(--comida-deep);
+    position: relative; border: 0; border-radius: 22px; background: var(--c); color: var(--ink-deep);
+    min-height: 150px; padding: 14px 8px 12px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    box-shadow: 0 7px 0 var(--d); transform: translateY(0);
+    transition: transform .06s, box-shadow .06s;
+    touch-action: manipulation; user-select: none; -webkit-user-select: none;
+  }
+  .key[data-part="alcohol"] { --c: var(--alcohol); --d: var(--alcohol-deep); color: #fff; }
+  .key[data-part="postre"] { --c: var(--postre); --d: var(--postre-deep); }
+  .key:active, .key.pressed { transform: translateY(6px); box-shadow: 0 1px 0 var(--d); }
+  .key .emoji { font-size: 46px; line-height: 1; }
+  .key .name { font-size: 18px; font-weight: 700; line-height: 1.1; text-align: center; }
+  .key .done {
+    position: absolute; top: 8px; right: 10px; font-size: 13px; font-weight: 700;
+    background: var(--ink-deep); color: var(--paper); border-radius: 999px; padding: 2px 8px;
+  }
+  .hint { margin: -14px 0 0; font-size: 14px; color: var(--muted); text-align: center; }
+
+  /* ---------- log ---------- */
+  .log h2 { margin: 0 0 6px; font-size: 18px; font-weight: 700; }
+  .log ul { list-style: none; margin: 0; padding: 0; }
+  .log li + li { border-top: 1px solid var(--line); }
+  .entry {
+    width: 100%; background: none; border: 0; text-align: left; padding: 12px 0;
+    display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px;
+  }
+  .entry .dots { display: flex; gap: 4px; }
+  .entry .dot { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--line); }
+  .entry .what { min-width: 0; }
+  .entry .what b { display: block; font-weight: 600; }
+  .entry .what span { display: block; font-size: 14px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .entry .val { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 17px; }
+  .empty { color: var(--muted); margin: 4px 0 0; }
+  .more { background: none; border: 0; color: var(--muted); padding: 10px 0 0; text-decoration: underline; }
+
+  .foot { display: flex; gap: 8px; flex-wrap: wrap; }
+  .ghost {
+    border: 1.5px solid var(--line); background: transparent; border-radius: 12px;
+    padding: 10px 14px; font-size: 15px; font-weight: 500;
+  }
+
+  /* ---------- toast with undo ---------- */
+  .toast {
+    position: fixed; left: 16px; right: 16px; bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+    max-width: 448px; margin: 0 auto; z-index: 20;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: var(--paper); color: var(--ink); border-radius: 16px; padding: 12px 12px 12px 16px;
+    font-weight: 600; box-shadow: 0 10px 30px rgb(0 0 0 / .35);
+    transform: translateY(140%); transition: transform .25s cubic-bezier(.2, .9, .3, 1);
+  }
+  .toast.show { transform: translateY(0); }
+  .toast button { border: 0; background: var(--ink); color: var(--paper); border-radius: 10px; padding: 8px 12px; font-weight: 700; flex: none; }
+
+  /* ---------- bottom sheets ---------- */
+  .scrim {
+    position: fixed; inset: 0; z-index: 30; background: rgb(8 12 32 / .6);
+    display: flex; align-items: flex-end; justify-content: center;
+  }
+  .sheet {
+    width: 100%; max-width: 480px; max-height: 88vh; overflow-y: auto;
+    background: var(--panel); border-radius: 24px 24px 0 0;
+    padding: 20px 16px calc(env(safe-area-inset-bottom, 0px) + 20px);
+    display: flex; flex-direction: column; gap: 14px;
+    animation: rise .25s cubic-bezier(.2, .9, .3, 1);
+  }
+  @keyframes rise { from { transform: translateY(40%); opacity: 0; } }
+  .sheet h3 { margin: 0; font-size: 20px; font-weight: 700; }
+  .sheet p { margin: 0; color: var(--muted); }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field > span { font-size: 14px; color: var(--muted); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .sheet input, .sheet select, .sheet textarea {
+    display: block; width: 100%; min-width: 0; min-height: 46px; margin: 0;
+    font: inherit; font-size: 16px; color: var(--paper); background: var(--ink);
+    border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 12px;
     -webkit-appearance: none; appearance: none;
   }
-  /* iOS Safari: date/time inputs ignore width, center their value and collapse when empty */
-  input[type="date"], input[type="time"] { line-height: 22px; text-align: left; }
-  input::-webkit-date-and-time-value { text-align: left; margin: 0; }
-  input::-webkit-datetime-edit { padding: 0; }
-  select {
-    padding-right: 32px;
-    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
-    background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%;
-    background-size: 5px 5px; background-repeat: no-repeat;
+  .sheet input[type="date"], .sheet input[type="time"] { line-height: 24px; text-align: left; }
+  .sheet input::-webkit-date-and-time-value { text-align: left; margin: 0; }
+  .sheet textarea { min-height: 76px; resize: vertical; }
+  .parts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .parts button {
+    border: 1.5px solid var(--line); background: transparent; border-radius: 14px; padding: 10px 4px;
+    display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 14px; font-weight: 600;
   }
-  textarea { min-height: 70px; resize: vertical; }
-  .row { display: flex; gap: 8px; }
-  .row > * { flex: 1; min-width: 0; }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  button { -webkit-appearance: none; appearance: none; cursor: pointer; }
-  .chips button {
-    flex: none; line-height: 1.2; border: 1px solid var(--border); background: var(--bg); color: var(--text);
-    border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 14px;
+  .parts button span { font-size: 26px; filter: grayscale(1); opacity: .5; }
+  .parts button[aria-pressed="true"] { border-color: var(--paper); background: var(--ink); }
+  .parts button[aria-pressed="true"] span { filter: none; opacity: 1; }
+  .actions { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+  .solid {
+    border: 0; border-radius: 14px; padding: 14px; font-size: 17px; font-weight: 700;
+    background: var(--paper); color: var(--ink);
   }
-  .chips button.on { background: var(--accent-soft); border-color: var(--accent); }
-  .btn {
-    display: block; width: 100%; border: 0; border-radius: 12px; padding: 14px;
-    font: inherit; font-weight: 600; background: var(--accent); color: #fff; margin-top: 16px;
+  .solid.danger { background: var(--over); color: var(--ink-deep); }
+  .link { background: none; border: 0; padding: 10px; color: var(--muted); font-weight: 500; }
+  .link.danger { color: var(--over); }
+
+  @media (max-width: 350px) {
+    .key { min-height: 128px; }
+    .key .emoji { font-size: 38px; }
+    .key .name { font-size: 16px; }
   }
-  .btn.secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
-  .btn.small { display: inline-block; width: auto; padding: 8px 14px; margin: 0; font-size: 14px; }
-  .icon-btn { background: none; border: 0; font-size: 20px; line-height: 1; color: var(--text); padding: 6px; }
-  .actions { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }
-  .actions > div { display: flex; }
-  ul.list { list-style: none; margin: 0; padding: 0; }
-  ul.list li { padding: 12px 0; border-bottom: 1px solid var(--border); display: flex; gap: 12px; }
-  ul.list li:last-child { border-bottom: 0; }
-  .meta { font-size: 13px; color: var(--muted); }
-  .desc { font-weight: 600; }
-  .grow { flex: 1; min-width: 0; }
-  .tag { white-space: nowrap; font-size: 12px; background: var(--accent-soft); border-radius: 6px; padding: 2px 6px; }
-  .empty { color: var(--muted); text-align: center; padding: 16px 0; }
-  .toast {
-    position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 24px); transform: translateX(-50%);
-    background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px;
-    opacity: 0; transition: opacity .2s; pointer-events: none; width: max-content; max-width: calc(100% - 32px); text-align: center;
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
   }
-  .toast.show { opacity: 1; }
-  .hidden, [hidden] { display: none !important; }
-  .btn.danger { background: var(--danger); }
-  .btn:focus-visible, .chips button:focus-visible, .icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .overlay {
-    position: fixed; inset: 0; background: rgb(0 0 0 / .45); display: flex; align-items: flex-end;
-    padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 16px); z-index: 10;
-  }
-  .overlay .card { width: 100%; max-width: 480px; margin: 0 auto; }
-  .overlay .btn { margin-top: 10px; }
-  .stars { display: flex; gap: 4px; }
-  .stars button { font-size: 26px; line-height: 1; background: none; border: 0; padding: 2px; opacity: .3; filter: grayscale(1); }
-  .stars button.on { filter: none; }
-  .stars button.on { opacity: 1; }
 </style>
 </head>
 <body>
-<header>
-  <h1>Comidas libres</h1>
-  <button class="icon-btn" id="btnSettings" aria-label="Ajustes">⚙️</button>
-</header>
-
-<section class="card quota">
-  <div class="big" id="quotaUsed">0</div>
-  <div class="grow">
-    <div><strong id="quotaText">de 0 esta semana</strong></div>
-    <div class="meta" id="quotaRange"></div>
-    <div class="bar"><div id="quotaBar" style="width:0"></div></div>
-  </div>
-</section>
-
-<h2 id="formTitle">Registrar comida libre</h2>
-<form class="card" id="form" autocomplete="off">
-  <div class="row">
-    <div><label for="fDate">Fecha</label><input type="date" id="fDate" required></div>
-    <div><label for="fTime">Hora</label><input type="time" id="fTime" required></div>
-  </div>
-
-  <label>Momento</label>
-  <div class="chips" id="fMeal"></div>
-
-  <label>¿Qué incluyó? <span class="meta">(cada una suma ⅓)</span></label>
-  <div class="chips" id="fParts"></div>
-  <div class="meta" id="fPartsValue" style="margin-top:6px"></div>
-
-  <label for="fDesc">¿Qué comiste?</label>
-  <input id="fDesc" placeholder="Ej: pizza con amigos, 3 porciones" required>
-
-  <label for="fPlace">Dónde / con quién</label>
-  <input id="fPlace" placeholder="Opcional">
-
-  <label>¿Cuánto lo disfrutaste?</label>
-  <div class="stars" id="fRating"></div>
-
-  <label for="fNotes">Notas</label>
-  <textarea id="fNotes" placeholder="Hambre, saciedad, cómo te sentiste…"></textarea>
-
-  <button class="btn" type="submit" id="btnSave">Guardar</button>
-  <button class="btn secondary hidden" type="button" id="btnCancel">Cancelar edición</button>
-</form>
-
-<h2>Historial</h2>
-<div class="card">
-  <ul class="list" id="list"></ul>
-</div>
-
-<h2>Excel</h2>
-<div class="card">
-  <p class="meta" style="margin-top:0">Los datos viven en el iPhone. Exportá un <b>.xlsx</b> para guardarlo en Archivos / iCloud Drive, o importá uno para restaurar.</p>
-  <div class="row">
-    <button class="btn small" id="btnExport" type="button">Exportar .xlsx</button>
-    <button class="btn small secondary" id="btnImport" type="button">Importar .xlsx</button>
-  </div>
-  <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden">
-</div>
-
-<section id="settings" class="hidden">
-  <h2>Ajustes</h2>
-  <div class="card">
-    <label for="sQuota">Comidas libres permitidas por semana</label>
-    <input type="number" id="sQuota" min="0" max="21" inputmode="numeric">
-    <label for="sWeekStart">La semana empieza el</label>
-    <select id="sWeekStart">
-      <option value="1">Lunes</option>
-      <option value="0">Domingo</option>
-    </select>
-    <label>Horarios para detectar el momento (hora de inicio)</label>
-    <div class="row">
-      <div><label for="sRangeDesayuno">Desayuno</label><input type="time" id="sRangeDesayuno"></div>
-      <div><label for="sRangeAlmuerzo">Almuerzo</label><input type="time" id="sRangeAlmuerzo"></div>
+<main>
+  <section class="top" aria-live="polite">
+    <div>
+      <p class="week-title" id="weekTitle">Esta semana</p>
+      <p class="week-left" id="weekLeft">2<small>comidas libres disponibles</small></p>
+      <div class="punch" id="punch" aria-hidden="true"></div>
     </div>
-    <div class="row">
-      <div><label for="sRangeMerienda">Merienda</label><input type="time" id="sRangeMerienda"></div>
-      <div><label for="sRangeCena">Cena</label><input type="time" id="sRangeCena"></div>
-    </div>
-    <p class="meta">Antes del desayuno (madrugada) cuenta como cena.</p>
-    <button class="btn" type="button" id="btnSaveSettings">Guardar ajustes</button>
-    <button class="btn secondary" type="button" id="btnWipe" style="color:var(--danger)">Borrar todos los datos</button>
-  </div>
-</section>
+    <button class="gear" id="btnSettings" aria-label="Ajustes">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </section>
 
-<div class="overlay" id="dialog" hidden>
-  <div class="card" role="dialog" aria-modal="true" aria-labelledby="dialogMsg">
-    <p id="dialogMsg" style="margin:0 0 6px;font-weight:600"></p>
-    <div id="dialogActions"></div>
+  <section class="when">
+    <p class="when-line" id="whenLine">Cena <span>de hoy</span></p>
+    <div class="seg" id="segMeal" role="group" aria-label="Momento"></div>
+    <div class="seg" id="segDay" role="group" aria-label="Día">
+      <button type="button" data-day="0">Hoy</button>
+      <button type="button" data-day="1">Ayer</button>
+      <label id="dayOtherLabel">Otro día<input type="date" id="dayOther" aria-label="Elegir otro día"></label>
+    </div>
+  </section>
+
+  <section class="pad" id="pad" aria-label="Registrar">
+    <button class="key" data-part="comida" type="button"><span class="emoji">🍔</span><span class="name">Comida</span></button>
+    <button class="key" data-part="alcohol" type="button"><span class="emoji">🍷</span><span class="name">Alcohol</span></button>
+    <button class="key" data-part="postre" type="button"><span class="emoji">🍰</span><span class="name">Postre</span></button>
+  </section>
+  <p class="hint">Cada toque suma ⅓. Las tres juntas son una comida libre.</p>
+
+  <section class="log">
+    <h2>Registros</h2>
+    <ul id="list"></ul>
+    <button class="more hidden" id="btnMore" type="button">Ver más</button>
+  </section>
+
+  <section class="foot">
+    <button class="ghost" id="btnExport" type="button">Exportar Excel</button>
+    <button class="ghost" id="btnImport" type="button">Importar Excel</button>
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden">
+  </section>
+</main>
+
+<!-- edit an entry -->
+<div class="scrim" id="editSheet" hidden>
+  <form class="sheet" id="editForm" autocomplete="off" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+    <h3 id="editTitle">Detalle</h3>
+    <div class="parts" id="editParts"></div>
+    <div class="row">
+      <label class="field"><span>Día</span><input type="date" id="eDate" required></label>
+      <label class="field"><span>Hora</span><input type="time" id="eTime" required></label>
+    </div>
+    <label class="field"><span>Momento</span>
+      <select id="eMeal"></select>
+    </label>
+    <label class="field"><span>Qué fue (opcional)</span><input id="eDesc" placeholder="Pizza con amigos"></label>
+    <label class="field"><span>Notas (opcional)</span><textarea id="eNotes" placeholder="Dónde, con quién, cómo te sentiste"></textarea></label>
+    <div class="actions">
+      <button class="solid" type="submit">Guardar cambios</button>
+      <button class="link danger" type="button" id="eDelete">Borrar registro</button>
+      <button class="link" type="button" data-close>Cerrar</button>
+    </div>
+  </form>
+</div>
+
+<!-- settings -->
+<div class="scrim" id="settingsSheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <h3 id="settingsTitle">Ajustes</h3>
+    <div class="row">
+      <label class="field"><span>Comidas libres por semana</span><input type="number" id="sQuota" min="0" max="21" step="1" inputmode="numeric"></label>
+      <label class="field"><span>La semana empieza</span>
+        <select id="sWeekStart"><option value="1">Lunes</option><option value="0">Domingo</option></select>
+      </label>
+    </div>
+    <p>Hora en que empieza cada momento. Antes del desayuno cuenta como cena.</p>
+    <div class="row">
+      <label class="field"><span>Desayuno</span><input type="time" id="sRangeDesayuno"></label>
+      <label class="field"><span>Almuerzo</span><input type="time" id="sRangeAlmuerzo"></label>
+      <label class="field"><span>Merienda</span><input type="time" id="sRangeMerienda"></label>
+      <label class="field"><span>Cena</span><input type="time" id="sRangeCena"></label>
+    </div>
+    <div class="actions">
+      <button class="solid" type="button" id="btnSaveSettings">Guardar ajustes</button>
+      <button class="link danger" type="button" id="btnWipe">Borrar todos los registros</button>
+      <button class="link" type="button" data-close>Cerrar</button>
+    </div>
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<!-- confirmation -->
+<div class="scrim" id="dialog" hidden>
+  <div class="sheet" role="alertdialog" aria-modal="true" aria-labelledby="dialogMsg">
+    <h3 id="dialogMsg"></h3>
+    <div class="actions" id="dialogActions"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"><span id="toastMsg"></span><button type="button" id="toastUndo">Deshacer</button></div>
 
 <script src="vendor/xlsx.mini.min.js"></script>
 <script src="app.js"></script>

@@ -54,11 +54,13 @@ function persist() {
 }
 
 let state = load();
+let dayOffset = 0;        // 0 = hoy, 1 = ayer, null = otro día (see pickedDate)
+let pickedDate = null;    // "YYYY-MM-DD" when dayOffset is null
+let pickedMeal = null;    // null = auto-detect from the clock
 let editingId = null;
-let meal = MEALS[1];
-let rating = 0;
-let parts = {};
-let mealTouched = false; // user picked the meal by hand, stop auto-detecting
+let editParts = {};
+let listLimit = 15;
+let freshWedges = 0;      // wedges to animate on next punch render
 
 // Ask iOS not to evict our storage (best effort).
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
@@ -92,144 +94,8 @@ function fmtThirds(n) {
 
 const fmtDay = (s) => parseDate(s).toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' });
 
-// ---------- render ----------
 
-function renderQuota() {
-  const [from, to] = weekBounds();
-  const week = state.entries.filter((e) => e.fecha >= from && e.fecha <= to);
-  const used = week.reduce((sum, e) => sum + thirdsOf(e), 0); // in thirds
-  const quota = (Number(state.settings.quota) || 0) * 3;
-  const over = used > quota;
-  $('quotaUsed').textContent = fmtThirds(used);
-  $('quotaUsed').classList.toggle('over', over);
-  $('quotaText').textContent = over
-    ? `de ${quota / 3} esta semana — te pasaste por ${fmtThirds(used - quota)}`
-    : `de ${quota / 3} esta semana — te quedan ${fmtThirds(quota - used)}`;
-  const byPart = PARTS.map(([k, , icon]) => `${icon} ${week.filter((e) => e.partes[k]).length}`).join('  ');
-  $('quotaRange').textContent = `${fmtDay(from)} → ${fmtDay(to)} · ${byPart}`;
-  const bar = $('quotaBar');
-  bar.style.width = `${quota ? Math.min(100, (used / quota) * 100) : (used ? 100 : 0)}%`;
-  bar.classList.toggle('over', over);
-}
-
-function renderChips() {
-  $('fMeal').innerHTML = '';
-  for (const m of MEALS) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.textContent = m;
-    b.className = m === meal ? 'on' : '';
-    b.onclick = () => { meal = m; mealTouched = true; renderChips(); };
-    $('fMeal').appendChild(b);
-  }
-}
-
-function renderParts() {
-  $('fParts').innerHTML = '';
-  for (const [k, label, icon] of PARTS) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.textContent = `${icon} ${label}`;
-    b.className = parts[k] ? 'on' : '';
-    b.onclick = () => { parts[k] = !parts[k]; renderParts(); };
-    $('fParts').appendChild(b);
-  }
-  const n = thirdsOf({ partes: parts });
-  $('fPartsValue').textContent = n === 3
-    ? 'Cuenta como 1 comida libre completa'
-    : n ? `Cuenta como ${fmtThirds(n)} de comida libre` : 'Elegí al menos una';
-}
-
-function renderStars() {
-  $('fRating').innerHTML = '';
-  for (let i = 1; i <= 5; i++) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.textContent = '⭐';
-    b.className = i <= rating ? 'on' : '';
-    b.onclick = () => { rating = rating === i ? 0 : i; renderStars(); };
-    $('fRating').appendChild(b);
-  }
-}
-
-function renderList() {
-  const list = $('list');
-  list.innerHTML = '';
-  const sorted = [...state.entries].sort((a, b) => (b.fecha + b.hora).localeCompare(a.fecha + a.hora));
-  if (!sorted.length) {
-    list.innerHTML = '<li class="empty">Todavía no registraste comidas libres</li>';
-    return;
-  }
-  for (const e of sorted) {
-    const li = document.createElement('li');
-    const body = document.createElement('div');
-    body.className = 'grow';
-    const desc = document.createElement('div');
-    desc.className = 'desc';
-    desc.textContent = e.descripcion;
-    const meta = document.createElement('div');
-    meta.className = 'meta';
-    meta.textContent = [fmtDay(e.fecha), e.hora, e.lugar].filter(Boolean).join(' · ')
-      + (e.disfrute ? ' · ' + '⭐'.repeat(e.disfrute) : '');
-    body.append(desc, meta);
-    if (e.notas) {
-      const notes = document.createElement('div');
-      notes.className = 'meta';
-      notes.textContent = e.notas;
-      body.appendChild(notes);
-    }
-    const tag = document.createElement('span');
-    tag.className = 'tag';
-    tag.textContent = `${e.momento} · ${fmtThirds(thirdsOf(e))}`;
-    const icons = document.createElement('div');
-    icons.className = 'meta';
-    icons.textContent = PARTS.filter(([k]) => e.partes[k]).map(([, label, icon]) => `${icon} ${label}`).join('  ');
-    body.insertBefore(icons, meta.nextSibling);
-    const edit = document.createElement('button');
-    edit.className = 'icon-btn';
-    edit.textContent = '✏️';
-    edit.setAttribute('aria-label', 'Editar');
-    edit.onclick = () => startEdit(e.id);
-    const del = document.createElement('button');
-    del.className = 'icon-btn';
-    del.textContent = '🗑️';
-    del.setAttribute('aria-label', 'Borrar');
-    del.onclick = () => remove(e.id);
-    const right = document.createElement('div');
-    right.className = 'actions';
-    const btns = document.createElement('div');
-    btns.append(edit, del);
-    right.append(tag, btns);
-    li.append(body, right);
-    list.appendChild(li);
-  }
-}
-
-function render() {
-  renderQuota();
-  renderChips();
-  renderParts();
-  renderStars();
-  renderList();
-}
-
-// ---------- form ----------
-
-function resetForm() {
-  const now = new Date();
-  editingId = null;
-  $('form').reset();
-  $('fDate').value = isoDate(now);
-  $('fTime').value = isoTime(now);
-  meal = guessMeal(isoTime(now));
-  mealTouched = false;
-  parts = { comida: true, alcohol: false, postre: false };
-  rating = 0;
-  $('formTitle').textContent = 'Registrar comida libre';
-  $('btnSave').textContent = 'Guardar';
-  $('btnCancel').classList.add('hidden');
-  render();
-}
+// ---------- when: day + meal context for the keypad ----------
 
 // time is "HH:MM"; zero-padded strings compare correctly.
 function guessMeal(time) {
@@ -241,98 +107,383 @@ function guessMeal(time) {
   return 'Cena';
 }
 
-$('fTime').addEventListener('input', () => {
-  if (mealTouched || !$('fTime').value) return;
-  meal = guessMeal($('fTime').value);
-  renderChips();
+function currentDate() {
+  if (dayOffset === null) return pickedDate;
+  const d = new Date();
+  d.setDate(d.getDate() - dayOffset);
+  return isoDate(d);
+}
+
+function currentMeal() {
+  return pickedMeal || guessMeal(isoTime(new Date()));
+}
+
+// Time stored for a tap: now when logging today, otherwise the start of the meal's range.
+function currentTime(meal) {
+  if (dayOffset === 0) return isoTime(new Date());
+  return state.settings.ranges[meal] || '12:00';
+}
+
+function dayLabel(fecha) {
+  const today = isoDate(new Date());
+  const y = new Date(); y.setDate(y.getDate() - 1);
+  if (fecha === today) return 'de hoy';
+  if (fecha === isoDate(y)) return 'de ayer';
+  return 'del ' + fmtDay(fecha);
+}
+
+// "la cena", "el almuerzo" — Spanish article for the meal name
+const withArticle = (m) => (['Merienda', 'Cena'].includes(m) ? 'la ' : 'el ') + m.toLowerCase();
+
+function renderWhen() {
+  const meal = currentMeal();
+  const fecha = currentDate();
+  $('whenLine').innerHTML = '';
+  $('whenLine').append(meal + ' ', Object.assign(document.createElement('span'), { textContent: dayLabel(fecha) }));
+
+  const seg = $('segMeal');
+  seg.innerHTML = '';
+  for (const m of MEALS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = m;
+    b.setAttribute('aria-pressed', String(m === meal));
+    b.onclick = () => {
+      // tapping the auto-detected meal again goes back to automatic
+      pickedMeal = m === guessMeal(isoTime(new Date())) ? null : m;
+      renderWhen();
+      renderPad();
+    };
+    seg.appendChild(b);
+  }
+  for (const b of $('segDay').querySelectorAll('button')) {
+    b.setAttribute('aria-pressed', String(Number(b.dataset.day) === dayOffset));
+  }
+  $('dayOtherLabel').classList.toggle('on', dayOffset === null);
+  $('dayOtherLabel').firstChild.textContent = dayOffset === null ? fmtDay(pickedDate) : 'Otro día';
+}
+
+for (const b of $('segDay').querySelectorAll('button')) {
+  b.onclick = () => {
+    dayOffset = Number(b.dataset.day);
+    pickedDate = null;
+    if (dayOffset === 0) pickedMeal = null; // back to today: meal follows the clock again
+    renderWhen();
+    renderPad();
+  };
+}
+$('dayOther').addEventListener('change', (ev) => {
+  const v = ev.target.value;
+  if (!v) return;
+  const today = isoDate(new Date());
+  if (v === today) { dayOffset = 0; pickedDate = null; } else { dayOffset = null; pickedDate = v; }
+  renderWhen();
+  renderPad();
 });
 
-function startEdit(id) {
+// ---------- keypad ----------
+
+function occasion(fecha, momento) {
+  return state.entries.find((e) => e.fecha === fecha && e.momento === momento);
+}
+
+function renderPad() {
+  const occ = occasion(currentDate(), currentMeal());
+  for (const key of $('pad').querySelectorAll('.key')) {
+    const part = key.dataset.part;
+    let badge = key.querySelector('.done');
+    const on = !!(occ && occ.partes[part]);
+    if (on && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'done';
+      badge.textContent = '✓';
+      key.appendChild(badge);
+    } else if (!on && badge) {
+      badge.remove();
+    }
+    const label = PARTS.find(([k]) => k === part)[1];
+    key.setAttribute('aria-label', on ? `${label}: ya sumado en esta comida` : `Sumar ${label.toLowerCase()}`);
+  }
+}
+
+function snapshot() {
+  return JSON.stringify(state.entries);
+}
+
+function tap(part) {
+  const fecha = currentDate();
+  const momento = currentMeal();
+  const noun = { comida: 'Comida fuera del plan', alcohol: 'Alcohol', postre: 'Postre' }[part];
+  const where = `${withArticle(momento)} ${dayLabel(fecha)}`;
+  const occ = occasion(fecha, momento);
+  if (occ && occ.partes[part]) {
+    toast(`${noun} ya estaba sumado en ${where}. Tocá el registro para editarlo.`);
+    return;
+  }
+  const before = snapshot();
+  if (occ) {
+    occ.partes[part] = true;
+  } else {
+    state.entries.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      fecha,
+      hora: currentTime(momento),
+      momento,
+      partes: { comida: false, alcohol: false, postre: false, [part]: true },
+      descripcion: '',
+      lugar: '',
+      disfrute: 0,
+      notas: '',
+    });
+  }
+  persist();
+  freshWedges = 1;
+  render();
+  toast(`${noun} sumado a ${where}`.replace(' a el ', ' al '), () => {
+    state.entries = JSON.parse(before);
+    persist();
+    render();
+    toast('Deshecho');
+  });
+}
+
+for (const key of $('pad').querySelectorAll('.key')) {
+  key.addEventListener('click', () => tap(key.dataset.part));
+}
+
+// ---------- week punch card ----------
+
+const PART_COLOR = { comida: 'var(--comida)', alcohol: 'var(--alcohol)', postre: 'var(--postre)' };
+
+function wedgePath(i) {
+  // third i of a circle centred at 24,24 with r=20, starting at 12 o'clock
+  const r = 20, c = 24;
+  const a0 = (-90 + i * 120) * Math.PI / 180;
+  const a1 = (-90 + (i + 1) * 120) * Math.PI / 180;
+  const p = (a) => `${(c + r * Math.cos(a)).toFixed(2)} ${(c + r * Math.sin(a)).toFixed(2)}`;
+  return `M${c} ${c} L${p(a0)} A${r} ${r} 0 0 1 ${p(a1)} Z`;
+}
+
+function renderWeek() {
+  const [from, to] = weekBounds();
+  const week = state.entries
+    .filter((e) => e.fecha >= from && e.fecha <= to)
+    .sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
+  const wedges = [];
+  for (const e of week) for (const [k] of PARTS) if (e.partes[k]) wedges.push(k);
+  const used = wedges.length;
+  const quota = (Number(state.settings.quota) || 0) * 3;
+  const left = quota - used;
+
+  const title = $('weekTitle');
+  const f = parseDate(from), t = parseDate(to);
+  const month = (d) => d.toLocaleDateString('es', { month: 'long' });
+  title.textContent = f.getMonth() === t.getMonth()
+    ? `Semana del ${f.getDate()} al ${t.getDate()} de ${month(t)}`
+    : `Semana del ${f.getDate()} de ${month(f)} al ${t.getDate()} de ${month(t)}`;
+  const big = $('weekLeft');
+  big.classList.toggle('over', left < 0);
+  big.innerHTML = '';
+  if (left >= 0) {
+    big.append(fmtThirds(left), Object.assign(document.createElement('small'), {
+      textContent: left === 3 ? 'comida libre disponible' : left > 0 && left < 3 ? 'de comida libre disponible' : 'comidas libres disponibles',
+    }));
+  } else {
+    big.append('+' + fmtThirds(-left), Object.assign(document.createElement('small'), {
+      textContent: 'por encima de lo permitido',
+    }));
+  }
+
+  const circles = Math.max(quota / 3, Math.ceil(used / 3), 1);
+  const ns = 'http://www.w3.org/2000/svg';
+  const punch = $('punch');
+  punch.innerHTML = '';
+  for (let c = 0; c < circles; c++) {
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 48 48');
+    const slot = document.createElementNS(ns, 'circle');
+    slot.setAttribute('cx', 24); slot.setAttribute('cy', 24); slot.setAttribute('r', 21);
+    slot.setAttribute('class', 'slot' + (c >= quota / 3 ? ' extra' : ''));
+    svg.appendChild(slot);
+    for (let i = 0; i < 3; i++) {
+      const idx = c * 3 + i;
+      if (idx >= used) break;
+      const w = document.createElementNS(ns, 'path');
+      w.setAttribute('d', wedgePath(i));
+      w.setAttribute('fill', PART_COLOR[wedges[idx]]);
+      w.setAttribute('class', 'wedge' + (idx >= used - freshWedges ? ' fresh' : ''));
+      svg.appendChild(w);
+    }
+    for (let i = 0; i < 3; i++) {
+      const a = (-90 + i * 120) * Math.PI / 180;
+      const l = document.createElementNS(ns, 'line');
+      l.setAttribute('x1', 24); l.setAttribute('y1', 24);
+      l.setAttribute('x2', (24 + 21 * Math.cos(a)).toFixed(2)); l.setAttribute('y2', (24 + 21 * Math.sin(a)).toFixed(2));
+      l.setAttribute('class', 'divider');
+      svg.appendChild(l);
+    }
+    punch.appendChild(svg);
+  }
+  freshWedges = 0;
+}
+
+// ---------- log ----------
+
+function renderList() {
+  const list = $('list');
+  list.innerHTML = '';
+  const sorted = [...state.entries].sort((a, b) => (b.fecha + b.hora).localeCompare(a.fecha + a.hora));
+  if (!sorted.length) {
+    const li = document.createElement('li');
+    li.className = 'empty';
+    li.textContent = 'Todavía no hay registros. Tocá una tecla cuando te des un gusto.';
+    list.appendChild(li);
+  }
+  for (const e of sorted.slice(0, listLimit)) {
+    const li = document.createElement('li');
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'entry';
+    b.onclick = () => openEdit(e.id);
+
+    const dots = document.createElement('span');
+    dots.className = 'dots';
+    for (const [k] of PARTS) {
+      const d = document.createElement('span');
+      d.className = 'dot';
+      if (e.partes[k]) { d.style.background = PART_COLOR[k]; d.style.borderColor = PART_COLOR[k]; }
+      dots.appendChild(d);
+    }
+    const what = document.createElement('span');
+    what.className = 'what';
+    const t = document.createElement('b');
+    t.textContent = `${e.momento} ${dayLabel(e.fecha)}`;
+    const sub = document.createElement('span');
+    const parts = PARTS.filter(([k]) => e.partes[k]).map(([, l]) => l.toLowerCase()).join(', ');
+    sub.textContent = e.descripcion || e.notas || parts.charAt(0).toUpperCase() + parts.slice(1);
+    what.append(t, sub);
+    const val = document.createElement('span');
+    val.className = 'val';
+    val.textContent = fmtThirds(thirdsOf(e));
+    b.append(dots, what, val);
+    b.setAttribute('aria-label', `${e.momento} ${dayLabel(e.fecha)}: ${parts}. Editar`);
+    li.appendChild(b);
+    list.appendChild(li);
+  }
+  $('btnMore').classList.toggle('hidden', sorted.length <= listLimit);
+}
+
+$('btnMore').onclick = () => { listLimit += 30; renderList(); };
+
+function render() {
+  renderWeek();
+  renderWhen();
+  renderPad();
+  renderList();
+}
+
+// ---------- sheets ----------
+
+function openSheet(id) { $(id).hidden = false; }
+function closeSheet(id) { $(id).hidden = true; }
+for (const scrim of document.querySelectorAll('.scrim')) {
+  scrim.addEventListener('click', (ev) => {
+    if (ev.target === scrim && scrim.id !== 'dialog') closeSheet(scrim.id);
+    if (ev.target.closest('[data-close]')) closeSheet(scrim.id);
+  });
+}
+
+function renderEditParts() {
+  const box = $('editParts');
+  box.innerHTML = '';
+  for (const [k, label, icon] of PARTS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('aria-pressed', String(!!editParts[k]));
+    b.append(Object.assign(document.createElement('span'), { textContent: icon }), k === 'comida' ? 'Comida' : label);
+    b.onclick = () => { editParts[k] = !editParts[k]; renderEditParts(); };
+    box.appendChild(b);
+  }
+}
+
+function openEdit(id) {
   const e = state.entries.find((x) => x.id === id);
   if (!e) return;
   editingId = id;
-  $('fDate').value = e.fecha;
-  $('fTime').value = e.hora;
-  $('fDesc').value = e.descripcion;
-  $('fPlace').value = e.lugar || '';
-  $('fNotes').value = e.notas || '';
-  meal = e.momento;
-  mealTouched = true;
-  parts = { ...e.partes };
-  rating = e.disfrute || 0;
-  $('formTitle').textContent = 'Editar comida libre';
-  $('btnSave').textContent = 'Guardar cambios';
-  $('btnCancel').classList.remove('hidden');
-  render();
-  $('formTitle').scrollIntoView({ behavior: 'smooth' });
+  editParts = { ...e.partes };
+  $('editTitle').textContent = `${e.momento} ${dayLabel(e.fecha)}`;
+  $('eDate').value = e.fecha;
+  $('eTime').value = e.hora;
+  $('eMeal').innerHTML = MEALS.map((m) => `<option${m === e.momento ? ' selected' : ''}>${m}</option>`).join('');
+  $('eDesc').value = e.descripcion || '';
+  $('eNotes').value = [e.lugar, e.notas].filter(Boolean).join(' — ');
+  renderEditParts();
+  openSheet('editSheet');
 }
 
-async function remove(id) {
-  if (await ask('¿Borrar este registro?', [['Borrar', 'ok', 'danger']]) !== 'ok') return;
-  state.entries = state.entries.filter((e) => e.id !== id);
-  persist();
-  if (editingId === id) resetForm(); else render();
-  toast('Registro borrado');
-}
-
-$('form').addEventListener('submit', (ev) => {
+$('editForm').addEventListener('submit', (ev) => {
   ev.preventDefault();
-  if (!thirdsOf({ partes: parts })) { toast('Elegí qué incluyó: comida, alcohol o postre'); return; }
-  const entry = {
-    id: editingId || (Date.now().toString(36) + Math.random().toString(36).slice(2, 6)),
-    fecha: $('fDate').value,
-    hora: $('fTime').value,
-    momento: meal,
-    partes: { ...parts },
-    descripcion: $('fDesc').value.trim(),
-    lugar: $('fPlace').value.trim(),
-    disfrute: rating,
-    notas: $('fNotes').value.trim(),
-  };
-  if (editingId) {
-    state.entries = state.entries.map((e) => (e.id === editingId ? entry : e));
-  } else {
-    state.entries.push(entry);
-  }
+  if (!thirdsOf({ partes: editParts })) { toast('Marcá al menos comida, alcohol o postre'); return; }
+  const e = state.entries.find((x) => x.id === editingId);
+  if (!e) return;
+  Object.assign(e, {
+    fecha: $('eDate').value,
+    hora: $('eTime').value,
+    momento: $('eMeal').value,
+    partes: { ...editParts },
+    descripcion: $('eDesc').value.trim(),
+    lugar: '',
+    notas: $('eNotes').value.trim(),
+  });
   persist();
-  toast(editingId ? 'Cambios guardados' : 'Comida libre registrada');
-  resetForm();
+  closeSheet('editSheet');
+  render();
+  toast('Cambios guardados');
 });
 
-$('btnCancel').onclick = resetForm;
+$('eDelete').onclick = async () => {
+  const before = snapshot();
+  closeSheet('editSheet');
+  state.entries = state.entries.filter((e) => e.id !== editingId);
+  persist();
+  render();
+  toast('Registro borrado', () => { state.entries = JSON.parse(before); persist(); render(); toast('Deshecho'); });
+};
 
 // ---------- settings ----------
 
 $('btnSettings').onclick = () => {
-  const s = $('settings');
-  s.classList.toggle('hidden');
   $('sQuota').value = state.settings.quota;
   $('sWeekStart').value = String(state.settings.weekStart);
   for (const m of Object.keys(DEFAULT_RANGES)) $(`sRange${m}`).value = state.settings.ranges[m];
-  if (!s.classList.contains('hidden')) s.scrollIntoView({ behavior: 'smooth' });
+  openSheet('settingsSheet');
 };
 
 $('btnSaveSettings').onclick = () => {
-  state.settings.quota = Math.max(0, parseInt($('sQuota').value, 10) || 0);
-  state.settings.weekStart = Number($('sWeekStart').value);
   const ranges = {};
   for (const m of Object.keys(DEFAULT_RANGES)) ranges[m] = $(`sRange${m}`).value || DEFAULT_RANGES[m];
   const order = Object.values(ranges);
-  if (order.some((t, i) => i && t <= order[i - 1])) { toast('Los horarios tienen que ir en orden'); return; }
+  if (order.some((t, i) => i && t <= order[i - 1])) {
+    toast('Los horarios tienen que ir de desayuno a cena, en orden');
+    return;
+  }
+  state.settings.quota = Math.max(0, parseInt($('sQuota').value, 10) || 0);
+  state.settings.weekStart = Number($('sWeekStart').value);
   state.settings.ranges = ranges;
   persist();
-  $('settings').classList.add('hidden');
+  closeSheet('settingsSheet');
   render();
   toast('Ajustes guardados');
 };
 
 $('btnWipe').onclick = async () => {
-  const msg = '¿Borrar TODOS los registros? Exportá un Excel antes si querés conservarlos.';
+  closeSheet('settingsSheet');
+  const msg = '¿Borrar todos los registros? Si querés conservarlos, exportá el Excel antes.';
   if (await ask(msg, [['Borrar todo', 'ok', 'danger']]) !== 'ok') return;
   state.entries = [];
   persist();
-  resetForm();
-  toast('Datos borrados');
+  render();
+  toast('Registros borrados');
 };
 
 // ---------- Excel ----------
@@ -430,14 +581,14 @@ async function importXlsx(file) {
   const imported = [];
   for (const r of rows) {
     const e = Object.fromEntries(COLUMNS.map(([k, h]) => [k, r[h]]));
-    if (!e.fecha || !e.descripcion) continue;
+    if (!e.fecha) continue;
     imported.push({
       id: String(e.id || (Date.now().toString(36) + Math.random().toString(36).slice(2, 6))),
       fecha: cellToDate(e.fecha),
       hora: cellToTime(e.hora),
       momento: MEALS.includes(e.momento) ? e.momento : 'Snack',
       partes: cellsToParts(r),
-      descripcion: String(e.descripcion),
+      descripcion: String(e.descripcion || ''),
       lugar: String(e.lugar || ''),
       disfrute: Math.max(0, Math.min(5, parseInt(e.disfrute, 10) || 0)),
       notas: String(e.notas || ''),
@@ -457,7 +608,7 @@ async function importXlsx(file) {
     state.entries = [...byId.values()];
   }
   persist();
-  resetForm();
+  render();
   toast(`Importados ${imported.length} registros`);
 }
 
@@ -469,46 +620,53 @@ $('fileInput').onchange = async (ev) => {
   if (f) importXlsx(f).catch(() => toast('No se pudo leer el archivo'));
 };
 
+
 // ---------- misc ----------
 
-// In-page confirmation dialog (native confirm() is unreliable in embedded views).
+// In-page confirmation (native confirm() is unreliable in embedded views).
 // actions: [label, value, variant?]; resolves to the chosen value, or null on cancel.
 function ask(message, actions) {
   return new Promise((resolve) => {
-    const dlg = $('dialog');
     $('dialogMsg').textContent = message;
     const box = $('dialogActions');
     box.innerHTML = '';
-    const close = (v) => { dlg.hidden = true; resolve(v); };
+    const close = (v) => { closeSheet('dialog'); resolve(v); };
     for (const [label, value, variant] of actions) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'btn' + (variant === 'danger' ? ' danger' : '');
+      b.className = 'solid' + (variant === 'danger' ? ' danger' : '');
       b.textContent = label;
       b.onclick = () => close(value);
       box.appendChild(b);
     }
     const cancel = document.createElement('button');
     cancel.type = 'button';
-    cancel.className = 'btn secondary';
+    cancel.className = 'link';
     cancel.textContent = 'Cancelar';
     cancel.onclick = () => close(null);
     box.appendChild(cancel);
-    dlg.hidden = false;
+    openSheet('dialog');
   });
 }
 
 let toastTimer;
-function toast(msg) {
-  const t = $('toast');
-  t.textContent = msg;
-  t.classList.add('show');
+let toastUndo = null;
+function toast(msg, undo) {
+  $('toastMsg').textContent = msg;
+  toastUndo = undo || null;
+  $('toastUndo').hidden = !undo;
+  $('toast').classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+  toastTimer = setTimeout(() => { $('toast').classList.remove('show'); toastUndo = null; }, undo ? 5000 : 2600);
 }
+$('toastUndo').onclick = () => { const fn = toastUndo; toastUndo = null; if (fn) fn(); };
+
+// Keep "today" and the auto-detected meal fresh when the app comes back to the foreground.
+document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
+setInterval(render, 60 * 1000);
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
-resetForm();
+render();
