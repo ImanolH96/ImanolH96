@@ -235,7 +235,7 @@ function renderPad() {
       badge.remove();
     }
     const label = PARTS.find(([k]) => k === part)[1];
-    key.setAttribute('aria-label', on ? `${label}: ya sumado en esta comida` : `Sumar ${label.toLowerCase()}`);
+    key.setAttribute('aria-label', on ? `${label}: sumado. Tocá para sacarlo` : `Sumar ${label.toLowerCase()}`);
   }
 }
 
@@ -249,11 +249,23 @@ function tap(part) {
   const noun = { comida: 'Comida fuera del plan', alcohol: 'Alcohol', postre: 'Dulce' }[part];
   const where = `${withArticle(momento)} ${dayLabel(fecha)}`;
   const occ = occasion(fecha, momento);
+  const before = snapshot();
+  const undo = () => {
+    state.entries = JSON.parse(before);
+    persist();
+    render();
+    toast('Deshecho');
+  };
+  // keys toggle: tapping a part that's already in this meal takes it out
   if (occ && occ.partes[part]) {
-    toast(`${noun} ya estaba sumado en ${where}. Tocá el registro para editarlo.`);
+    occ.partes[part] = false;
+    const empty = !thirdsOf(occ);
+    if (empty) state.entries = state.entries.filter((e) => e !== occ);
+    persist();
+    render();
+    toast(empty ? `Registro de ${where} borrado` : `${noun} sacado de ${where}`, undo);
     return;
   }
-  const before = snapshot();
   if (occ) {
     occ.partes[part] = true;
   } else {
@@ -272,12 +284,7 @@ function tap(part) {
   persist();
   freshWedges = 1;
   if (weekOffsetOf(fecha) !== weekOffset) goWeek(weekOffsetOf(fecha)); else render();
-  toast(`${noun} sumado a ${where}`.replace(' a el ', ' al '), () => {
-    state.entries = JSON.parse(before);
-    persist();
-    render();
-    toast('Deshecho');
-  });
+  toast(`${noun} sumado a ${where}`.replace(' a el ', ' al '), undo);
 }
 
 for (const key of $('pad').querySelectorAll('.key')) {
