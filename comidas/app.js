@@ -147,7 +147,8 @@ function renderWhen() {
     : parseDate(fecha).toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/^\w/, (c) => c.toUpperCase());
   $('dayBtnText').textContent = short;
   $('dayNext').disabled = !away;
-  btn.classList.toggle('away', away);
+  $('dayToday').hidden = !away;
+  $('dayPill').classList.toggle('away', away);
   btn.setAttribute('aria-label', `Día: ${dayLabel(fecha).replace(/^de(l)? /, '')}. Cambiar día`);
 
   const seg = $('segMeal');
@@ -209,6 +210,7 @@ function stepDay(delta) {
   useDay(isoDate(d));
 }
 $('dayPrev').onclick = () => stepDay(-1);
+$('dayToday').onclick = () => useDay(isoDate(new Date()));
 $('dayNext').onclick = () => stepDay(1);
 
 // ---------- keypad ----------
