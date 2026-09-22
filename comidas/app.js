@@ -2,6 +2,14 @@
 
 const STORE_KEY = 'comidas-libres:v1';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
+// A full free meal = the three parts; each part counts as 1/3.
+const PARTS = [
+  ['comida', 'Comida fuera del plan', '🍔'],
+  ['alcohol', 'Alcohol', '🍷'],
+  ['postre', 'Postre', '🍰'],
+];
+// Start time of each auto-detected meal; before breakfast counts as dinner (late night).
+const DEFAULT_RANGES = { Desayuno: '05:00', Almuerzo: '11:00', Merienda: '15:30', Cena: '19:00' };
 // Excel column headers <-> entry fields
 const COLUMNS = [
   ['fecha', 'Fecha'],
@@ -9,6 +17,10 @@ const COLUMNS = [
   ['momento', 'Momento'],
   ['descripcion', 'Descripción'],
   ['lugar', 'Dónde / con quién'],
+  ['comida', 'Comida fuera del plan'],
+  ['alcohol', 'Alcohol'],
+  ['postre', 'Postre'],
+  ['valor', 'Valor (comidas libres)'],
   ['disfrute', 'Disfrute (1-5)'],
   ['notas', 'Notas'],
   ['id', 'ID'],
@@ -19,11 +31,18 @@ const $ = (id) => document.getElementById(id);
 // ---------- storage ----------
 
 function load() {
+  let data = null;
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) data = JSON.parse(raw);
   } catch (e) { /* fall through to defaults */ }
-  return { settings: { quota: 2, weekStart: 1 }, entries: [] };
+  data = data || { settings: { quota: 2, weekStart: 1 }, entries: [] };
+  data.settings.ranges = { ...DEFAULT_RANGES, ...data.settings.ranges };
+  // Entries from before partial counting were full free meals.
+  for (const e of data.entries) {
+    if (!e.partes) e.partes = { comida: true, alcohol: true, postre: true };
+  }
+  return data;
 }
 
 function persist() {
@@ -38,6 +57,8 @@ let state = load();
 let editingId = null;
 let meal = MEALS[1];
 let rating = 0;
+let parts = {};
+let mealTouched = false; // user picked the meal by hand, stop auto-detecting
 
 // Ask iOS not to evict our storage (best effort).
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
@@ -58,21 +79,34 @@ function weekBounds(ref = new Date()) {
   return [isoDate(start), isoDate(end)];
 }
 
+// ---------- partial counting (in thirds, to avoid float rounding) ----------
+
+const thirdsOf = (e) => PARTS.filter(([k]) => e.partes && e.partes[k]).length;
+
+function fmtThirds(n) {
+  const whole = Math.floor(n / 3);
+  const frac = ['', '⅓', '⅔'][n % 3];
+  if (!whole) return frac || '0';
+  return whole + frac;
+}
+
 const fmtDay = (s) => parseDate(s).toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' });
 
 // ---------- render ----------
 
 function renderQuota() {
   const [from, to] = weekBounds();
-  const used = state.entries.filter((e) => e.fecha >= from && e.fecha <= to).length;
-  const quota = Number(state.settings.quota) || 0;
+  const week = state.entries.filter((e) => e.fecha >= from && e.fecha <= to);
+  const used = week.reduce((sum, e) => sum + thirdsOf(e), 0); // in thirds
+  const quota = (Number(state.settings.quota) || 0) * 3;
   const over = used > quota;
-  $('quotaUsed').textContent = used;
+  $('quotaUsed').textContent = fmtThirds(used);
   $('quotaUsed').classList.toggle('over', over);
   $('quotaText').textContent = over
-    ? `de ${quota} esta semana — te pasaste por ${used - quota}`
-    : `de ${quota} esta semana — te quedan ${quota - used}`;
-  $('quotaRange').textContent = `${fmtDay(from)} → ${fmtDay(to)}`;
+    ? `de ${quota / 3} esta semana — te pasaste por ${fmtThirds(used - quota)}`
+    : `de ${quota / 3} esta semana — te quedan ${fmtThirds(quota - used)}`;
+  const byPart = PARTS.map(([k, , icon]) => `${icon} ${week.filter((e) => e.partes[k]).length}`).join('  ');
+  $('quotaRange').textContent = `${fmtDay(from)} → ${fmtDay(to)} · ${byPart}`;
   const bar = $('quotaBar');
   bar.style.width = `${quota ? Math.min(100, (used / quota) * 100) : (used ? 100 : 0)}%`;
   bar.classList.toggle('over', over);
@@ -85,9 +119,25 @@ function renderChips() {
     b.type = 'button';
     b.textContent = m;
     b.className = m === meal ? 'on' : '';
-    b.onclick = () => { meal = m; renderChips(); };
+    b.onclick = () => { meal = m; mealTouched = true; renderChips(); };
     $('fMeal').appendChild(b);
   }
+}
+
+function renderParts() {
+  $('fParts').innerHTML = '';
+  for (const [k, label, icon] of PARTS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = `${icon} ${label}`;
+    b.className = parts[k] ? 'on' : '';
+    b.onclick = () => { parts[k] = !parts[k]; renderParts(); };
+    $('fParts').appendChild(b);
+  }
+  const n = thirdsOf({ partes: parts });
+  $('fPartsValue').textContent = n === 3
+    ? 'Cuenta como 1 comida libre completa'
+    : n ? `Cuenta como ${fmtThirds(n)} de comida libre` : 'Elegí al menos una';
 }
 
 function renderStars() {
@@ -130,7 +180,11 @@ function renderList() {
     }
     const tag = document.createElement('span');
     tag.className = 'tag';
-    tag.textContent = e.momento;
+    tag.textContent = `${e.momento} · ${fmtThirds(thirdsOf(e))}`;
+    const icons = document.createElement('div');
+    icons.className = 'meta';
+    icons.textContent = PARTS.filter(([k]) => e.partes[k]).map(([, label, icon]) => `${icon} ${label}`).join('  ');
+    body.insertBefore(icons, meta.nextSibling);
     const edit = document.createElement('button');
     edit.className = 'icon-btn';
     edit.textContent = '✏️';
@@ -152,6 +206,7 @@ function renderList() {
 function render() {
   renderQuota();
   renderChips();
+  renderParts();
   renderStars();
   renderList();
 }
@@ -164,7 +219,9 @@ function resetForm() {
   $('form').reset();
   $('fDate').value = isoDate(now);
   $('fTime').value = isoTime(now);
-  meal = guessMeal(now);
+  meal = guessMeal(isoTime(now));
+  mealTouched = false;
+  parts = { comida: true, alcohol: false, postre: false };
   rating = 0;
   $('formTitle').textContent = 'Registrar comida libre';
   $('btnSave').textContent = 'Guardar';
@@ -172,13 +229,21 @@ function resetForm() {
   render();
 }
 
-function guessMeal(d) {
-  const h = d.getHours();
-  if (h < 11) return 'Desayuno';
-  if (h < 16) return 'Almuerzo';
-  if (h < 20) return 'Merienda';
+// time is "HH:MM"; zero-padded strings compare correctly.
+function guessMeal(time) {
+  const r = state.settings.ranges;
+  if (time < r.Desayuno) return 'Cena';
+  if (time < r.Almuerzo) return 'Desayuno';
+  if (time < r.Merienda) return 'Almuerzo';
+  if (time < r.Cena) return 'Merienda';
   return 'Cena';
 }
+
+$('fTime').addEventListener('input', () => {
+  if (mealTouched || !$('fTime').value) return;
+  meal = guessMeal($('fTime').value);
+  renderChips();
+});
 
 function startEdit(id) {
   const e = state.entries.find((x) => x.id === id);
@@ -190,6 +255,8 @@ function startEdit(id) {
   $('fPlace').value = e.lugar || '';
   $('fNotes').value = e.notas || '';
   meal = e.momento;
+  mealTouched = true;
+  parts = { ...e.partes };
   rating = e.disfrute || 0;
   $('formTitle').textContent = 'Editar comida libre';
   $('btnSave').textContent = 'Guardar cambios';
@@ -208,11 +275,13 @@ function remove(id) {
 
 $('form').addEventListener('submit', (ev) => {
   ev.preventDefault();
+  if (!thirdsOf({ partes: parts })) { toast('Elegí qué incluyó: comida, alcohol o postre'); return; }
   const entry = {
     id: editingId || (Date.now().toString(36) + Math.random().toString(36).slice(2, 6)),
     fecha: $('fDate').value,
     hora: $('fTime').value,
     momento: meal,
+    partes: { ...parts },
     descripcion: $('fDesc').value.trim(),
     lugar: $('fPlace').value.trim(),
     disfrute: rating,
@@ -237,12 +306,18 @@ $('btnSettings').onclick = () => {
   s.classList.toggle('hidden');
   $('sQuota').value = state.settings.quota;
   $('sWeekStart').value = String(state.settings.weekStart);
+  for (const m of Object.keys(DEFAULT_RANGES)) $(`sRange${m}`).value = state.settings.ranges[m];
   if (!s.classList.contains('hidden')) s.scrollIntoView({ behavior: 'smooth' });
 };
 
 $('btnSaveSettings').onclick = () => {
   state.settings.quota = Math.max(0, parseInt($('sQuota').value, 10) || 0);
   state.settings.weekStart = Number($('sWeekStart').value);
+  const ranges = {};
+  for (const m of Object.keys(DEFAULT_RANGES)) ranges[m] = $(`sRange${m}`).value || DEFAULT_RANGES[m];
+  const order = Object.values(ranges);
+  if (order.some((t, i) => i && t <= order[i - 1])) { toast('Los horarios tienen que ir en orden'); return; }
+  state.settings.ranges = ranges;
   persist();
   $('settings').classList.add('hidden');
   render();
@@ -262,23 +337,36 @@ $('btnWipe').onclick = () => {
 async function exportXlsx() {
   const rows = [...state.entries]
     .sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora))
-    .map((e) => Object.fromEntries(COLUMNS.map(([k, h]) => [h, e[k] ?? ''])));
+    .map((e) => {
+      const flat = { ...e, valor: Math.round((thirdsOf(e) / 3) * 100) / 100 };
+      for (const [k] of PARTS) flat[k] = e.partes[k] ? 'Sí' : 'No';
+      return Object.fromEntries(COLUMNS.map(([k, h]) => [h, flat[k] ?? '']));
+    });
   const ws = XLSX.utils.json_to_sheet(rows, { header: COLUMNS.map(([, h]) => h) });
-  ws['!cols'] = [12, 7, 11, 40, 22, 12, 40, 12].map((wch) => ({ wch }));
+  ws['!cols'] = [12, 7, 11, 20, 9, 9, 20, 40, 22, 12, 40, 12].map((wch) => ({ wch }));
 
   // Weekly summary sheet
   const weeks = {};
   for (const e of state.entries) {
     const [from] = weekBounds(parseDate(e.fecha));
-    weeks[from] = (weeks[from] || 0) + 1;
+    const w = weeks[from] || (weeks[from] = { thirds: 0, comida: 0, alcohol: 0, postre: 0 });
+    w.thirds += thirdsOf(e);
+    for (const [k] of PARTS) if (e.partes[k]) w[k]++;
   }
+  const round2 = (x) => Math.round(x * 100) / 100;
+  const quota = Number(state.settings.quota);
   const summary = Object.keys(weeks).sort().map((w) => ({
     'Semana desde': w,
-    'Comidas libres': weeks[w],
-    'Permitidas': Number(state.settings.quota),
-    'Diferencia': Number(state.settings.quota) - weeks[w],
+    'Comidas fuera del plan': weeks[w].comida,
+    'Alcohol': weeks[w].alcohol,
+    'Postre': weeks[w].postre,
+    'Comidas libres': round2(weeks[w].thirds / 3),
+    'Permitidas': quota,
+    'Diferencia': round2(quota - weeks[w].thirds / 3),
   }));
-  const ws2 = XLSX.utils.json_to_sheet(summary, { header: ['Semana desde', 'Comidas libres', 'Permitidas', 'Diferencia'] });
+  const ws2 = XLSX.utils.json_to_sheet(summary, {
+    header: ['Semana desde', 'Comidas fuera del plan', 'Alcohol', 'Postre', 'Comidas libres', 'Permitidas', 'Diferencia'],
+  });
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Comidas');
@@ -320,6 +408,18 @@ function cellToTime(v) {
   return String(v || '00:00').trim().slice(0, 5);
 }
 
+const yes = (v) => /^(s[ií]|si|x|1|true|verdadero)$/i.test(String(v).trim());
+
+function cellsToParts(row) {
+  const cols = PARTS.map(([k]) => COLUMNS.find(([c]) => c === k)[1]);
+  // Spreadsheets without part columns (older exports) are full free meals.
+  if (!cols.some((h) => h in row)) return { comida: true, alcohol: true, postre: true };
+  const partes = {};
+  PARTS.forEach(([k], i) => { partes[k] = yes(row[cols[i]]); });
+  if (!thirdsOf({ partes })) partes.comida = true;
+  return partes;
+}
+
 async function importXlsx(file) {
   const wb = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array', cellDates: true });
   const ws = wb.Sheets['Comidas'] || wb.Sheets[wb.SheetNames[0]];
@@ -333,6 +433,7 @@ async function importXlsx(file) {
       fecha: cellToDate(e.fecha),
       hora: cellToTime(e.hora),
       momento: MEALS.includes(e.momento) ? e.momento : 'Snack',
+      partes: cellsToParts(r),
       descripcion: String(e.descripcion),
       lugar: String(e.lugar || ''),
       disfrute: Math.max(0, Math.min(5, parseInt(e.disfrute, 10) || 0)),

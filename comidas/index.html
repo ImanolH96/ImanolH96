@@ -102,6 +102,10 @@
   <label>Momento</label>
   <div class="chips" id="fMeal"></div>
 
+  <label>¿Qué incluyó? <span class="meta">(cada una suma ⅓)</span></label>
+  <div class="chips" id="fParts"></div>
+  <div class="meta" id="fPartsValue" style="margin-top:6px"></div>
+
   <label for="fDesc">¿Qué comiste?</label>
   <input id="fDesc" placeholder="Ej: pizza con amigos, 3 porciones" required>
 
@@ -143,6 +147,16 @@
       <option value="1">Lunes</option>
       <option value="0">Domingo</option>
     </select>
+    <label>Horarios para detectar el momento (hora de inicio)</label>
+    <div class="row">
+      <div><label for="sRangeDesayuno">Desayuno</label><input type="time" id="sRangeDesayuno"></div>
+      <div><label for="sRangeAlmuerzo">Almuerzo</label><input type="time" id="sRangeAlmuerzo"></div>
+    </div>
+    <div class="row">
+      <div><label for="sRangeMerienda">Merienda</label><input type="time" id="sRangeMerienda"></div>
+      <div><label for="sRangeCena">Cena</label><input type="time" id="sRangeCena"></div>
+    </div>
+    <p class="meta">Antes del desayuno (madrugada) cuenta como cena.</p>
     <button class="btn" type="button" id="btnSaveSettings">Guardar ajustes</button>
     <button class="btn secondary" type="button" id="btnWipe" style="color:var(--danger)">Borrar todos los datos</button>
   </div>
