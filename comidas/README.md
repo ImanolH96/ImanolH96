@@ -12,7 +12,7 @@ Tres pestañas abajo: **Registrar** (abre siempre en el día de hoy; se puede ca
 - **Botonera de un toque**: 🍔 Comida fuera del plan, 🍷 Alcohol y 🍰 Dulce. Cada tecla suma ⅓; las tres juntas son una comida libre.
 - Usa la fecha de hoy y detecta el momento por la hora (editable en ⚙️):
   Desayuno 05:00–11:00 · Almuerzo 11:00–15:30 · Merienda 15:30–19:00 · Cena 19:00–05:00.
-  Se puede cambiar el momento con los botones, o el día con la fila de arriba: ‹ › de a un día, el calendario "Hoy ▾" abre la lista de días (se resalta cuando no es hoy) y "Ir a hoy" vuelve a hoy.
+  Se puede cambiar el momento con los botones, o el día con la fila de arriba: ‹ › de a un día, el calendario "Hoy ▾" abre la lista de días (se resalta cuando no es hoy) y "↺ Hoy" vuelve a hoy.
 - Los toques del mismo momento y día se juntan en un solo registro (ej. cena con comida + alcohol = ⅔). Las teclas funcionan como interruptor: tocar una parte ya sumada (✓) la saca, y si no queda ninguna el registro se borra. Cada toque se puede deshacer.
 - Tarjeta semanal: un círculo de tres porciones por cada comida libre permitida (por defecto 2 por semana, configurable). Si te pasás aparecen círculos extra punteados.
 - Estado con color, ícono y texto en la semana, el mes, el listado de semanas y la gráfica semanal: ★ Semana limpia (0 comidas libres) y ✓ Vas bien / Dentro del plan en verde, = Al límite en blanco, ! Por encima del cupo / del límite en rojo. El mes se compara con lo permitido hasta hoy.
