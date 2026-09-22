@@ -156,14 +156,14 @@ function renderWhen() {
     };
     seg.appendChild(b);
   }
-  for (const b of $('segDay').querySelectorAll('button')) {
+  for (const b of $('segDay').querySelectorAll('button[data-day]')) {
     b.setAttribute('aria-pressed', String(Number(b.dataset.day) === dayOffset));
   }
-  $('dayOtherLabel').classList.toggle('on', dayOffset === null);
-  $('dayOtherLabel').firstChild.textContent = dayOffset === null ? fmtDay(pickedDate) : 'Otro día';
+  $('dayOtherBtn').setAttribute('aria-pressed', String(dayOffset === null));
+  $('dayOtherBtn').textContent = dayOffset === null ? fmtDay(pickedDate) : 'Otro día';
 }
 
-for (const b of $('segDay').querySelectorAll('button')) {
+for (const b of $('segDay').querySelectorAll('button[data-day]')) {
   b.onclick = () => {
     dayOffset = Number(b.dataset.day);
     pickedDate = null;
@@ -172,14 +172,40 @@ for (const b of $('segDay').querySelectorAll('button')) {
     renderPad();
   };
 }
-$('dayOther').addEventListener('change', (ev) => {
-  const v = ev.target.value;
+function useDay(v) {
   if (!v) return;
   const today = isoDate(new Date());
-  if (v === today) { dayOffset = 0; pickedDate = null; } else { dayOffset = null; pickedDate = v; }
+  if (v > today) { toast('Elegí hoy o un día anterior'); return; }
+  if (v === today) { dayOffset = 0; pickedDate = null; pickedMeal = null; } else { dayOffset = null; pickedDate = v; }
+  closeSheet('daySheet');
   renderWhen();
   renderPad();
-});
+}
+
+// "Otro día": a sheet with the last days as buttons plus a visible date field
+// (an invisible date input over a button doesn't open the picker on iOS).
+$('dayOtherBtn').onclick = () => {
+  const grid = $('dayGrid');
+  grid.innerHTML = '';
+  const current = currentDate();
+  for (let i = 2; i <= 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const iso = isoDate(d);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('aria-pressed', String(iso === current));
+    const wd = d.toLocaleDateString('es', { weekday: 'long' });
+    b.append(wd.charAt(0).toUpperCase() + wd.slice(1),
+      Object.assign(document.createElement('small'), { textContent: d.toLocaleDateString('es', { day: 'numeric', month: 'short' }) }));
+    b.onclick = () => useDay(iso);
+    grid.appendChild(b);
+  }
+  $('dayPick').max = isoDate(new Date());
+  $('dayPick').value = current;
+  openSheet('daySheet');
+};
+$('dayUse').onclick = () => useDay($('dayPick').value);
 
 // ---------- keypad ----------
 

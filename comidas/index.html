@@ -74,12 +74,19 @@
   .when-line { margin: 0; font-size: 22px; font-weight: 700; }
   .when-line span { color: var(--muted); font-weight: 500; }
   .seg { display: flex; flex-wrap: wrap; gap: 6px; }
-  .seg button, .seg label {
+  .seg button {
     position: relative; border: 1.5px solid var(--line); background: transparent; color: var(--paper);
     border-radius: 999px; padding: 7px 13px; font-size: 15px; line-height: 1.2; font-weight: 500;
   }
-  .seg button[aria-pressed="true"], .seg label.on { background: var(--paper); color: var(--ink); border-color: var(--paper); }
-  .seg label input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; }
+  .seg button[aria-pressed="true"] { background: var(--paper); color: var(--ink); border-color: var(--paper); }
+  .days { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .days button {
+    border: 1.5px solid var(--line); background: transparent; border-radius: 14px; padding: 12px 4px;
+    font-size: 15px; font-weight: 600; line-height: 1.2;
+  }
+  .days button small { display: block; font-weight: 400; color: var(--muted); font-size: 13px; }
+  .days button[aria-pressed="true"] { background: var(--paper); color: var(--ink); border-color: var(--paper); }
+  .days button[aria-pressed="true"] small { color: var(--ink); }
 
   /* ---------- the keypad ---------- */
   .pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
@@ -211,7 +218,7 @@
     <div class="seg" id="segDay" role="group" aria-label="Día">
       <button type="button" data-day="0">Hoy</button>
       <button type="button" data-day="1">Ayer</button>
-      <label id="dayOtherLabel">Otro día<input type="date" id="dayOther" aria-label="Elegir otro día"></label>
+      <button type="button" id="dayOtherBtn">Otro día</button>
     </div>
   </section>
 
@@ -255,6 +262,19 @@
       <button class="link" type="button" data-close>Cerrar</button>
     </div>
   </form>
+</div>
+
+<!-- pick another day -->
+<div class="scrim" id="daySheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="dayTitle">
+    <h3 id="dayTitle">¿Qué día fue?</h3>
+    <div class="days" id="dayGrid"></div>
+    <label class="field"><span>O elegí una fecha</span><input type="date" id="dayPick"></label>
+    <div class="actions">
+      <button class="solid" type="button" id="dayUse">Usar esta fecha</button>
+      <button class="link" type="button" data-close>Cerrar</button>
+    </div>
+  </div>
 </div>
 
 <!-- settings -->
