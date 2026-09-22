@@ -343,6 +343,8 @@ function weekStatus(used, quota, finished) {
 }
 
 // "1 comida libre", "2 comidas libres"
+// Over the weekly quota, show the quota plus the extra: "1+2" (thirds in, text out).
+const fmtUsed = (used, quota) => (used > quota ? `${fmtThirds(quota)}+${fmtThirds(used - quota)}` : fmtThirds(used));
 const mealsWord = (n) => `${n} ${n === 1 ? 'comida libre' : 'comidas libres'}`;
 
 // Progress bar in thirds: a tick at every whole free meal, a marker at the quota,
@@ -395,17 +397,18 @@ function renderWeek() {
   $('weekStatus').innerHTML = '';
   $('weekStatus').appendChild(statusPill(st));
   $('punch').className = `punch s-${st.key}`;
-  if (!current) {
+  const extra = () => Object.assign(document.createElement('span'), { className: 'extra', textContent: `+${fmtThirds(used - quota)}` });
+  if (left < 0) {
+    big.append(fmtThirds(quota), extra(), Object.assign(document.createElement('small'), {
+      textContent: `${mealsWord(quota / 3)} de cupo + ${fmtThirds(used - quota)} extra`,
+    }));
+  } else if (!current) {
     big.append(fmtThirds(used), Object.assign(document.createElement('small'), {
       textContent: left < 0 ? `de ${mealsWord(quota / 3)} de la semana` : `de ${mealsWord(quota / 3)} usadas`,
     }));
   } else if (left >= 0) {
     big.append(fmtThirds(left), Object.assign(document.createElement('small'), {
       textContent: left === 3 ? 'comida libre disponible' : left > 0 && left < 3 ? 'de comida libre disponible' : 'comidas libres disponibles',
-    }));
-  } else {
-    big.append(fmtThirds(used), Object.assign(document.createElement('small'), {
-      textContent: `de ${mealsWord(quota / 3)} de la semana`,
     }));
   }
 
@@ -509,8 +512,8 @@ function renderToday() {
   const head = document.createElement('span');
   head.className = 'head';
   head.append(Object.assign(document.createElement('small'), { textContent: 'Esta semana' }), statusPill(st));
-  const text = `Usaste ${fmtThirds(used)} de ${mealsWord(quota / 3)}`;
-  const note = left > 0 ? `Te quedan ${fmtThirds(left)}` : left === 0 ? 'Cupo completo' : `${fmtThirds(-left)} por encima del cupo`;
+  const text = left < 0 ? `Usaste ${fmtThirds(quota)} + ${fmtThirds(-left)} extra` : `Usaste ${fmtThirds(used)} de ${mealsWord(quota / 3)}`;
+  const note = left > 0 ? `Te quedan ${fmtThirds(left)}` : left === 0 ? 'Cupo completo' : `Cupo semanal: ${quota / 3}`;
   box.append(head, Object.assign(document.createElement('b'), { textContent: text }), progressBar(used, quota),
     Object.assign(document.createElement('small'), { className: 'note', textContent: note }));
   box.setAttribute('aria-label', `Esta semana: ${text}. ${note}. ${st.label}. Ver semana`);
@@ -604,7 +607,7 @@ function renderMonth() {
     bar.appendChild(fill);
     const val = Object.assign(document.createElement('span'), {
       className: 'wkval',
-      textContent: `${fmtThirds(used)} / ${quota / 3}`,
+      textContent: used > quota ? fmtUsed(used, quota) : `${fmtThirds(used)} / ${quota / 3}`,
     });
     b.append(icon, label, bar, val);
     b.setAttribute('aria-label', `Semana del ${weekRangeLabel(from, to)}: ${fmtThirds(used)} de ${quota / 3}, ${st.label}. Ver semana`);
@@ -871,7 +874,7 @@ function renderWeekly(y, m) {
     });
     el('rect', { x: cx - band / 2, y: T, width: band, height: H - T - B, class: 'hit' }, g);
     const total = w.c.comida + w.c.alcohol + w.c.postre;
-    el('text', { x: cx, y: yv(acc) - 6, class: 'endlabel', 'text-anchor': 'middle' }, svg).textContent = fmtThirds(total);
+    el('text', { x: cx, y: yv(acc) - 6, class: 'endlabel', 'text-anchor': 'middle' }, svg).textContent = fmtUsed(total, quota * 3);
     const st = weekStatus(total, quota * 3, w.to < today);
     const by = yv(acc) - 30;
     el('circle', { cx, cy: by, r: 8, class: `stdot s-${st.key}` }, svg);
