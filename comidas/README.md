@@ -11,6 +11,8 @@ Todo corre en el dispositivo: sin servidor, sin cuentas, sin backend. Funciona o
   Se puede cambiar a Ayer / otro día u otro momento antes de tocar.
 - Los toques del mismo momento y día se juntan en un solo registro (ej. cena con comida + alcohol = ⅔). Cada toque se puede deshacer.
 - Tarjeta semanal: un círculo de tres porciones por cada comida libre permitida (por defecto 2 por semana, configurable). Si te pasás aparecen círculos extra punteados.
+- Navegación por semana con las flechas ‹ ›: la tarjeta y los registros muestran la semana elegida ("Volver a esta semana" regresa).
+- Resumen del mes con sus propias flechas: total de comidas libres, cuántas veces hubo comida, alcohol y postre, y una barra por semana (tocándola vas a esa semana). El Excel suma la hoja `Resumen mensual`.
 - Detalle opcional: tocando un registro se puede agregar qué fue y notas, cambiar día/hora/partes o borrarlo.
 - **Exportar a Excel (.xlsx)** con dos hojas: `Comidas` (una columna Sí/No por parte y el valor, ej. 0.67) y `Resumen semanal`. En iPhone abre el menú Compartir → "Guardar en Archivos", WhatsApp, mail, etc.
 - **Importar desde Excel**: lee la hoja `Comidas` (podés editarla en Numbers/Excel y volver a cargarla). Te deja reemplazar todo o combinar.

@@ -125,7 +125,35 @@
   .entry .what span { display: block; font-size: 14px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .entry .val { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 17px; }
   .empty { color: var(--muted); margin: 4px 0 0; }
-  .more { background: none; border: 0; color: var(--muted); padding: 10px 0 0; text-decoration: underline; }
+  .top > div { min-width: 0; flex: 1; }
+  .week-nav { display: flex; align-items: center; gap: 4px; margin-left: -10px; }
+  .nav {
+    flex: none; width: 36px; height: 36px; border: 0; background: none; border-radius: 50%;
+    color: var(--paper); padding: 0; display: grid; place-items: center;
+  }
+  .nav svg { display: block; }
+  .nav:disabled { opacity: .25; cursor: default; }
+  .nav:not(:disabled):active { background: var(--panel); }
+  .today-link { margin-top: 12px; border: 0; background: none; padding: 0; color: var(--comida); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+
+  .month { display: flex; flex-direction: column; gap: 8px; }
+  .month-head { display: flex; align-items: center; gap: 4px; margin-left: -10px; }
+  .month-head h2 { margin: 0; font-size: 18px; font-weight: 700; min-width: 7.5em; text-align: center; }
+  .month-total { margin: 0; color: var(--muted); }
+  .month-total b { color: var(--paper); font-size: 22px; font-variant-numeric: tabular-nums; }
+  .month-total span { display: block; margin-top: 2px; }
+  .weeks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .wk {
+    width: 100%; display: grid; grid-template-columns: 10.5em 1fr 3.2em; align-items: center; gap: 12px;
+    border: 1.5px solid transparent; background: var(--panel); border-radius: 14px; padding: 10px 12px;
+    text-align: left; font-size: 15px;
+  }
+  .wk.on { border-color: var(--paper); }
+  .wkbar { height: 8px; border-radius: 4px; background: var(--ink); overflow: hidden; }
+  .wkbar i { display: block; height: 100%; background: var(--comida); border-radius: 4px; }
+  .wkbar i.over { background: var(--over); }
+  .wkval { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .wkval.over { color: var(--over); }
 
   .foot { display: flex; gap: 8px; flex-wrap: wrap; }
   .ghost {
@@ -142,6 +170,7 @@
     font-weight: 600; box-shadow: 0 10px 30px rgb(0 0 0 / .35);
     transform: translateY(140%); transition: transform .25s cubic-bezier(.2, .9, .3, 1);
   }
+  .toast:not(.show) { visibility: hidden; transition: transform .25s, visibility 0s .25s; }
   .toast.show { transform: translateY(0); }
   .toast button { border: 0; background: var(--ink); color: var(--paper); border-radius: 10px; padding: 8px 12px; font-weight: 700; flex: none; }
 
@@ -203,9 +232,14 @@
 <main>
   <section class="top" aria-live="polite">
     <div>
-      <p class="week-title" id="weekTitle">Esta semana</p>
+      <div class="week-nav">
+        <button class="nav" id="wkPrev" type="button" aria-label="Semana anterior"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <p class="week-title" id="weekTitle">Esta semana</p>
+        <button class="nav" id="wkNext" type="button" aria-label="Semana siguiente"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
+      </div>
       <p class="week-left" id="weekLeft">2<small>comidas libres disponibles</small></p>
       <div class="punch" id="punch" aria-hidden="true"></div>
+      <button class="today-link" id="wkToday" type="button" hidden>Volver a esta semana</button>
     </div>
     <button class="gear" id="btnSettings" aria-label="Ajustes">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
@@ -230,9 +264,18 @@
   <p class="hint">Cada toque suma ⅓. Las tres juntas son una comida libre.</p>
 
   <section class="log">
-    <h2>Registros</h2>
+    <h2 id="logTitle">Registros de esta semana</h2>
     <ul id="list"></ul>
-    <button class="more hidden" id="btnMore" type="button">Ver más</button>
+  </section>
+
+  <section class="month">
+    <div class="month-head">
+      <button class="nav" id="moPrev" type="button" aria-label="Mes anterior"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <h2 id="monthTitle">Septiembre</h2>
+      <button class="nav" id="moNext" type="button" aria-label="Mes siguiente"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
+    </div>
+    <p class="month-total" id="monthTotal"></p>
+    <ul class="weeks" id="monthWeeks"></ul>
   </section>
 
   <section class="foot">

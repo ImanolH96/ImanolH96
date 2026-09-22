@@ -59,7 +59,8 @@ let pickedDate = null;    // "YYYY-MM-DD" when dayOffset is null
 let pickedMeal = null;    // null = auto-detect from the clock
 let editingId = null;
 let editParts = {};
-let listLimit = 15;
+let weekOffset = 0;       // 0 = this week, 1 = last week, ...
+let monthRef = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })();
 let freshWedges = 0;      // wedges to animate on next punch render
 
 // Ask iOS not to evict our storage (best effort).
@@ -264,7 +265,7 @@ function tap(part) {
   }
   persist();
   freshWedges = 1;
-  render();
+  if (weekOffsetOf(fecha) !== weekOffset) goWeek(weekOffsetOf(fecha)); else render();
   toast(`${noun} sumado a ${where}`.replace(' a el ', ' al '), () => {
     state.entries = JSON.parse(before);
     persist();
@@ -290,8 +291,36 @@ function wedgePath(i) {
   return `M${c} ${c} L${p(a0)} A${r} ${r} 0 0 1 ${p(a1)} Z`;
 }
 
+const DAY_MS = 864e5;
+const MONTH = (d) => d.toLocaleDateString('es', { month: 'long' });
+
+function viewedWeek() {
+  const d = new Date();
+  d.setDate(d.getDate() - 7 * weekOffset);
+  return weekBounds(d);
+}
+
+// How many weeks back from this week is the week containing `fecha`.
+function weekOffsetOf(fecha) {
+  const [now] = weekBounds();
+  const [then] = weekBounds(parseDate(fecha));
+  return Math.max(0, Math.round((parseDate(now) - parseDate(then)) / (7 * DAY_MS)));
+}
+
+function weekRangeLabel(from, to, short) {
+  const f = parseDate(from), t = parseDate(to);
+  const m = (d) => (short ? d.toLocaleDateString('es', { month: 'short' }).replace('.', '') : MONTH(d));
+  return f.getMonth() === t.getMonth()
+    ? `${f.getDate()} al ${t.getDate()} de ${m(t)}`
+    : `${f.getDate()} de ${m(f)} al ${t.getDate()} de ${m(t)}`;
+}
+
+function thirdsBetween(from, to) {
+  return state.entries.filter((e) => e.fecha >= from && e.fecha <= to).reduce((n, e) => n + thirdsOf(e), 0);
+}
+
 function renderWeek() {
-  const [from, to] = weekBounds();
+  const [from, to] = viewedWeek();
   const week = state.entries
     .filter((e) => e.fecha >= from && e.fecha <= to)
     .sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
@@ -301,16 +330,21 @@ function renderWeek() {
   const quota = (Number(state.settings.quota) || 0) * 3;
   const left = quota - used;
 
-  const title = $('weekTitle');
-  const f = parseDate(from), t = parseDate(to);
-  const month = (d) => d.toLocaleDateString('es', { month: 'long' });
-  title.textContent = f.getMonth() === t.getMonth()
-    ? `Semana del ${f.getDate()} al ${t.getDate()} de ${month(t)}`
-    : `Semana del ${f.getDate()} de ${month(f)} al ${t.getDate()} de ${month(t)}`;
+  const current = weekOffset === 0;
+  const range = weekRangeLabel(from, to, true);
+  $('weekTitle').textContent = current ? `Esta semana, ${range}`
+    : weekOffset === 1 ? `Semana pasada, ${range}`
+    : `Semana del ${range}`;
+  $('wkNext').disabled = current;
+  $('wkToday').hidden = current;
   const big = $('weekLeft');
   big.classList.toggle('over', left < 0);
   big.innerHTML = '';
-  if (left >= 0) {
+  if (!current) {
+    big.append(fmtThirds(used), Object.assign(document.createElement('small'), {
+      textContent: left < 0 ? `de ${quota / 3} permitidas, te pasaste por ${fmtThirds(-left)}` : `de ${quota / 3} comidas libres usadas`,
+    }));
+  } else if (left >= 0) {
     big.append(fmtThirds(left), Object.assign(document.createElement('small'), {
       textContent: left === 3 ? 'comida libre disponible' : left > 0 && left < 3 ? 'de comida libre disponible' : 'comidas libres disponibles',
     }));
@@ -358,14 +392,20 @@ function renderWeek() {
 function renderList() {
   const list = $('list');
   list.innerHTML = '';
-  const sorted = [...state.entries].sort((a, b) => (b.fecha + b.hora).localeCompare(a.fecha + a.hora));
+  const [from, to] = viewedWeek();
+  const sorted = state.entries
+    .filter((e) => e.fecha >= from && e.fecha <= to)
+    .sort((a, b) => (b.fecha + b.hora).localeCompare(a.fecha + a.hora));
+  $('logTitle').textContent = weekOffset === 0 ? 'Registros de esta semana' : `Registros del ${weekRangeLabel(from, to, true)}`;
   if (!sorted.length) {
     const li = document.createElement('li');
     li.className = 'empty';
-    li.textContent = 'Todavía no hay registros. Tocá una tecla cuando te des un gusto.';
+    li.textContent = weekOffset === 0
+      ? 'Sin registros esta semana. Tocá una tecla cuando te des un gusto.'
+      : 'Sin registros esa semana.';
     list.appendChild(li);
   }
-  for (const e of sorted.slice(0, listLimit)) {
+  for (const e of sorted) {
     const li = document.createElement('li');
     const b = document.createElement('button');
     b.type = 'button';
@@ -396,16 +436,89 @@ function renderList() {
     li.appendChild(b);
     list.appendChild(li);
   }
-  $('btnMore').classList.toggle('hidden', sorted.length <= listLimit);
 }
 
-$('btnMore').onclick = () => { listLimit += 30; renderList(); };
+// ---------- month ----------
+
+function renderMonth() {
+  const y = monthRef.getFullYear(), m = monthRef.getMonth();
+  const first = isoDate(new Date(y, m, 1));
+  const last = isoDate(new Date(y, m + 1, 0));
+  const title = MONTH(monthRef);
+  $('monthTitle').textContent = title.charAt(0).toUpperCase() + title.slice(1) + (y !== new Date().getFullYear() ? ` ${y}` : '');
+  const now = new Date();
+  $('moNext').disabled = y === now.getFullYear() && m === now.getMonth();
+
+  const inMonth = state.entries.filter((e) => e.fecha >= first && e.fecha <= last);
+  const total = inMonth.reduce((n, e) => n + thirdsOf(e), 0);
+  const counts = PARTS.map(([k, , icon]) => `${icon} ${inMonth.filter((e) => e.partes[k]).length}`).join('   ');
+  $('monthTotal').innerHTML = '';
+  $('monthTotal').append(
+    Object.assign(document.createElement('b'), { textContent: fmtThirds(total) }),
+    total === 3 ? ' comida libre en el mes' : total > 0 && total < 3 ? ' de comida libre en el mes' : ' comidas libres en el mes',
+    Object.assign(document.createElement('span'), { textContent: counts }),
+  );
+
+  // every week that touches the month, counted whole
+  const quota = (Number(state.settings.quota) || 0) * 3;
+  const ul = $('monthWeeks');
+  ul.innerHTML = '';
+  let [from, to] = weekBounds(parseDate(first));
+  const today = isoDate(now);
+  while (from <= last && from <= today) {
+    const used = thirdsBetween(from, to);
+    const offset = weekOffsetOf(from);
+    const li = document.createElement('li');
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'wk' + (offset === weekOffset ? ' on' : '');
+    b.onclick = () => { weekOffset = offset; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    const label = Object.assign(document.createElement('span'), { textContent: weekRangeLabel(from, to, true) });
+    const bar = document.createElement('span');
+    bar.className = 'wkbar';
+    const fill = document.createElement('i');
+    fill.style.width = `${quota ? Math.min(100, (used / quota) * 100) : used ? 100 : 0}%`;
+    if (used > quota) fill.className = 'over';
+    bar.appendChild(fill);
+    const val = Object.assign(document.createElement('span'), {
+      className: 'wkval' + (used > quota ? ' over' : ''),
+      textContent: `${fmtThirds(used)} / ${quota / 3}`,
+    });
+    b.append(label, bar, val);
+    b.setAttribute('aria-label', `Semana del ${weekRangeLabel(from, to)}: ${fmtThirds(used)} de ${quota / 3}. Ver semana`);
+    li.appendChild(b);
+    ul.appendChild(li);
+    const next = parseDate(from); next.setDate(next.getDate() + 7);
+    from = isoDate(next);
+    const end = new Date(next); end.setDate(end.getDate() + 6);
+    to = isoDate(end);
+  }
+}
+
+$('moPrev').onclick = () => { monthRef = new Date(monthRef.getFullYear(), monthRef.getMonth() - 1, 1); renderMonth(); };
+$('moNext').onclick = () => { monthRef = new Date(monthRef.getFullYear(), monthRef.getMonth() + 1, 1); renderMonth(); };
+
+// week navigation (the month card follows the viewed week)
+function goWeek(offset) {
+  weekOffset = Math.max(0, offset);
+  const [from] = viewedWeek();
+  const d = parseDate(from);
+  d.setDate(d.getDate() + 3); // the month a week "belongs" to: the one holding its middle day
+  monthRef = new Date(d.getFullYear(), d.getMonth(), 1);
+  const now = new Date();
+  if (monthRef > now) monthRef = new Date(now.getFullYear(), now.getMonth(), 1);
+  render();
+}
+$('wkPrev').onclick = () => goWeek(weekOffset + 1);
+$('wkNext').onclick = () => goWeek(weekOffset - 1);
+$('wkToday').onclick = () => goWeek(0);
 
 function render() {
   renderWeek();
   renderWhen();
   renderPad();
   renderList();
+  renderMonth();
 }
 
 // ---------- sheets ----------
@@ -548,9 +661,25 @@ async function exportXlsx() {
     header: ['Semana desde', 'Comidas fuera del plan', 'Alcohol', 'Postre', 'Comidas libres', 'Permitidas', 'Diferencia'],
   });
 
+  const months = {};
+  for (const e of state.entries) {
+    const k = e.fecha.slice(0, 7);
+    const mo = months[k] || (months[k] = { thirds: 0, comida: 0, alcohol: 0, postre: 0 });
+    mo.thirds += thirdsOf(e);
+    for (const [p] of PARTS) if (e.partes[p]) mo[p]++;
+  }
+  const ws3 = XLSX.utils.json_to_sheet(Object.keys(months).sort().map((k) => ({
+    'Mes': k,
+    'Comidas fuera del plan': months[k].comida,
+    'Alcohol': months[k].alcohol,
+    'Postre': months[k].postre,
+    'Comidas libres': round2(months[k].thirds / 3),
+  })), { header: ['Mes', 'Comidas fuera del plan', 'Alcohol', 'Postre', 'Comidas libres'] });
+
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Comidas');
   XLSX.utils.book_append_sheet(wb, ws2, 'Resumen semanal');
+  XLSX.utils.book_append_sheet(wb, ws3, 'Resumen mensual');
   const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
   const name = `comidas-libres-${isoDate(new Date())}.xlsx`;
   const type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
