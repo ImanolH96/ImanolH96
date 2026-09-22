@@ -510,7 +510,7 @@ function el(name, attrs, parent) {
 
 let chartData = null; // what the hover layer reads
 
-function renderChart(y, m, inMonth) {
+function renderCumulative(y, m, inMonth) {
   const days = new Date(y, m + 1, 0).getDate();
   const now = new Date();
   const isCurrent = y === now.getFullYear() && m === now.getMonth();
@@ -599,14 +599,245 @@ function showTip(ev) {
     Object.assign(document.createElement('span'), { textContent: `Límite a la fecha: ${fmtThirds(Math.round(c.pace(day) * 3))}` }),
   );
   tip.hidden = false;
+  tip.style.top = '0px';
   // sit beside the crosshair, on whichever side has room
   const px = (cx / c.W) * box.width;
   const w = tip.offsetWidth;
   tip.style.left = `${px + 12 + w <= box.width ? px + 12 : Math.max(0, px - 12 - w)}px`;
 }
 
-$('chart').addEventListener('pointermove', showTip);
-$('chart').addEventListener('pointerdown', showTip);
+// ---------- other chart views ----------
+
+const VIEWS = [
+  ['acum', 'Acumulado'],
+  ['semanas', 'Por semana'],
+  ['momentos', 'Momentos'],
+  ['calendario', 'Calendario'],
+];
+const CAPTIONS = {
+  acum: 'Acumulado del mes. La línea fina es el límite según tus comidas libres por semana.',
+  semanas: 'Cada columna es una semana entera, dividida en comida, alcohol y postre. La línea es tu cupo semanal.',
+  momentos: 'En qué momento del día caen las comidas libres del mes.',
+  calendario: 'Cada día del mes; más intenso es más comida libre ese día.',
+};
+const chartView = () => (VIEWS.some(([k]) => k === state.settings.chartView) ? state.settings.chartView : 'acum');
+
+function renderViewSwitch() {
+  const box = $('chartSwitch');
+  box.innerHTML = '';
+  for (const [k, label] of VIEWS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    b.setAttribute('aria-pressed', String(k === chartView()));
+    b.onclick = () => { state.settings.chartView = k; persist(); renderMonth(); };
+    box.appendChild(b);
+  }
+}
+
+function renderChart(y, m, inMonth) {
+  renderViewSwitch();
+  const view = chartView();
+  $('chartCaption').textContent = CAPTIONS[view];
+  chartData = null;
+  hideTip();
+  if (view === 'acum') renderCumulative(y, m, inMonth);
+  else if (view === 'semanas') renderWeekly(y, m);
+  else if (view === 'momentos') renderMoments(y, m, inMonth);
+  else renderCalendar(y, m, inMonth);
+  renderLegend(view);
+}
+
+function renderLegend(view) {
+  const lg = $('chartLegend');
+  lg.innerHTML = '';
+  if (view === 'acum') return; // one series: the caption names it
+  if (view === 'calendario') {
+    const sp = document.createElement('span');
+    sp.style.gap = '4px';
+    sp.append('Menos ');
+    for (const o of [0, 1, 2, 3]) sp.append(Object.assign(document.createElement('i'), { className: `heat h${o}` }));
+    sp.append(' Más');
+    lg.appendChild(sp);
+    return;
+  }
+  for (const [k, label] of PARTS) {
+    const it = document.createElement('span');
+    it.append(Object.assign(document.createElement('i'), { className: 'sw', style: `background:${PART_COLOR[k]}` }), k === 'comida' ? 'Comida' : label);
+    lg.appendChild(it);
+  }
+}
+
+// rect with only the top corners rounded (data-end), square at the baseline
+function topRounded(x, y, w, h, r) {
+  r = Math.min(r, h, w / 2);
+  return `M${x} ${y + h} V${y + r} Q${x} ${y} ${x + r} ${y} H${x + w - r} Q${x + w} ${y} ${x + w} ${y + r} V${y + h} Z`;
+}
+function rightRounded(x, y, w, h, r) {
+  r = Math.min(r, w, h / 2);
+  return `M${x} ${y} H${x + w - r} Q${x + w} ${y} ${x + w} ${y + r} V${y + h - r} Q${x + w} ${y + h} ${x + w - r} ${y + h} H${x} Z`;
+}
+
+const partCounts = (list) => {
+  const c = { comida: 0, alcohol: 0, postre: 0 };
+  for (const e of list) for (const [k] of PARTS) if (e.partes[k]) c[k]++;
+  return c;
+};
+const tipLines = (title, c) => [title,
+  ...PARTS.filter(([k]) => c[k]).map(([k, l]) => `${k === 'comida' ? 'Comida' : l}: ${c[k]}`),
+  `Total: ${fmtThirds(c.comida + c.alcohol + c.postre)}`].join('\n');
+
+function renderWeekly(y, m) {
+  const first = isoDate(new Date(y, m, 1));
+  const last = isoDate(new Date(y, m + 1, 0));
+  const today = isoDate(new Date());
+  const weeks = [];
+  let [from, to] = weekBounds(parseDate(first));
+  while (from <= last && from <= today) {
+    const list = state.entries.filter((e) => e.fecha >= from && e.fecha <= to);
+    weeks.push({ from, to, c: partCounts(list) });
+    const n = parseDate(from); n.setDate(n.getDate() + 7); from = isoDate(n);
+    const t = new Date(n); t.setDate(t.getDate() + 6); to = isoDate(t);
+  }
+  const quota = Number(state.settings.quota) || 0;
+  const W = 340, H = 190, L = 26, R = 42, T = 18, B = 26;
+  const maxY = Math.max(1, Math.ceil(Math.max(quota, ...weeks.map((w) => (w.c.comida + w.c.alcohol + w.c.postre) / 3))));
+  const yv = (v) => T + (1 - v / maxY) * (H - T - B);
+  const svg = $('chart');
+  svg.innerHTML = '';
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  for (let v = 0; v <= maxY; v += maxY <= 5 ? 1 : 2) {
+    el('line', { x1: L, x2: W - R + 6, y1: yv(v), y2: yv(v), class: v === 0 ? 'axis' : 'grid' }, svg);
+    el('text', { x: L - 8, y: yv(v) + 4, class: 'tick', 'text-anchor': 'end' }, svg).textContent = v;
+  }
+  const band = (W - L - R) / Math.max(weeks.length, 1);
+  const bw = Math.min(24, band * 0.5);
+  weeks.forEach((w, i) => {
+    const cx = L + band * (i + 0.5);
+    let acc = 0;
+    const segs = PARTS.filter(([k]) => w.c[k]);
+    const g = el('g', { 'data-tip': tipLines(`Semana del ${weekRangeLabel(w.from, w.to, true)}`, w.c) }, svg);
+    segs.forEach(([k], j) => {
+      const v = w.c[k] / 3;
+      const y0 = yv(acc + v), h = yv(acc) - yv(acc + v);
+      const gap = j ? 2 : 0; // surface gap between stacked segments
+      const hh = Math.max(0, h - gap);
+      if (j === segs.length - 1) el('path', { d: topRounded(cx - bw / 2, y0, bw, hh, 4), fill: PART_COLOR[k] }, g);
+      else el('rect', { x: cx - bw / 2, y: y0, width: bw, height: hh, fill: PART_COLOR[k] }, g);
+      acc += v;
+    });
+    el('rect', { x: cx - band / 2, y: T, width: band, height: H - T - B, class: 'hit' }, g);
+    const total = w.c.comida + w.c.alcohol + w.c.postre;
+    el('text', { x: cx, y: yv(acc) - 6, class: 'endlabel', 'text-anchor': 'middle' }, svg).textContent = fmtThirds(total);
+    const f = parseDate(w.from), t = parseDate(w.to);
+    el('text', { x: cx, y: H - 8, class: 'tick', 'text-anchor': 'middle' }, svg).textContent = `${f.getDate()}–${t.getDate()}`;
+  });
+  el('line', { x1: L, x2: W - R + 6, y1: yv(quota), y2: yv(quota), class: 'pace' }, svg);
+  el('text', { x: W - R + 8, y: yv(quota) + 4, class: 'tick' }, svg).textContent = 'cupo';
+  tableFrom(['Semana', 'Comida', 'Alcohol', 'Postre', 'Total'],
+    weeks.map((w) => [weekRangeLabel(w.from, w.to, true), w.c.comida, w.c.alcohol, w.c.postre, fmtThirds(w.c.comida + w.c.alcohol + w.c.postre)]), 'Comidas libres por semana');
+}
+
+function renderMoments(y, m, inMonth) {
+  const rows = MEALS.map((meal) => ({ meal, c: partCounts(inMonth.filter((e) => e.momento === meal)) }));
+  const W = 340, rowH = 32, L = 78, R = 36, T = 6;
+  const H = T + rows.length * rowH + 4;
+  const max = Math.max(1, ...rows.map((r) => (r.c.comida + r.c.alcohol + r.c.postre) / 3));
+  const xv = (v) => L + (v / Math.ceil(max)) * (W - L - R);
+  const svg = $('chart');
+  svg.innerHTML = '';
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  el('line', { x1: L, x2: L, y1: T, y2: H - 4, class: 'axis' }, svg);
+  rows.forEach((r, i) => {
+    const cy = T + rowH * (i + 0.5);
+    el('text', { x: L - 10, y: cy + 4, class: 'cat', 'text-anchor': 'end' }, svg).textContent = r.meal;
+    const g = el('g', { 'data-tip': tipLines(r.meal, r.c) }, svg);
+    let acc = 0;
+    const segs = PARTS.filter(([k]) => r.c[k]);
+    segs.forEach(([k], j) => {
+      const v = r.c[k] / 3;
+      const x0 = xv(acc) + (j ? 2 : 0), w = Math.max(0, xv(acc + v) - xv(acc) - (j ? 2 : 0));
+      if (j === segs.length - 1) el('path', { d: rightRounded(x0, cy - 9, w, 18, 4), fill: PART_COLOR[k] }, g);
+      else el('rect', { x: x0, y: cy - 9, width: w, height: 18, fill: PART_COLOR[k] }, g);
+      acc += v;
+    });
+    el('rect', { x: 0, y: cy - rowH / 2, width: W, height: rowH, class: 'hit' }, g);
+    const total = r.c.comida + r.c.alcohol + r.c.postre;
+    el('text', { x: xv(acc) + 8, y: cy + 4, class: total ? 'endlabel' : 'tick' }, svg).textContent = total ? fmtThirds(total) : '0';
+  });
+  tableFrom(['Momento', 'Comida', 'Alcohol', 'Postre', 'Total'],
+    rows.map((r) => [r.meal, r.c.comida, r.c.alcohol, r.c.postre, fmtThirds(r.c.comida + r.c.alcohol + r.c.postre)]), 'Comidas libres por momento del día');
+}
+
+function renderCalendar(y, m, inMonth) {
+  const days = new Date(y, m + 1, 0).getDate();
+  const ws = state.settings.weekStart;
+  const lead = (new Date(y, m, 1).getDay() - ws + 7) % 7;
+  const rowsN = Math.ceil((lead + days) / 7);
+  const W = 340, gap = 5, top = 20;
+  const cell = (W - gap * 6) / 7;
+  const cellH = Math.min(cell, 40);
+  const H = top + rowsN * (cellH + gap);
+  const today = isoDate(new Date());
+  const svg = $('chart');
+  svg.innerHTML = '';
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const names = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+  for (let i = 0; i < 7; i++) {
+    el('text', { x: i * (cell + gap) + cell / 2, y: 12, class: 'tick', 'text-anchor': 'middle' }, svg).textContent = names[(i + ws) % 7];
+  }
+  const byDay = {};
+  for (const e of inMonth) (byDay[e.fecha] = byDay[e.fecha] || []).push(e);
+  const rows = [];
+  for (let d = 1; d <= days; d++) {
+    const iso = isoDate(new Date(y, m, d));
+    const list = byDay[iso] || [];
+    const c = partCounts(list);
+    const t = c.comida + c.alcohol + c.postre;
+    const i = lead + d - 1;
+    const cx = (i % 7) * (cell + gap), cy = top + Math.floor(i / 7) * (cellH + gap);
+    const future = iso > today;
+    const date = new Date(y, m, d).toLocaleDateString('es', { weekday: 'long', day: 'numeric' });
+    const g = el('g', future ? {} : { 'data-tip': t ? tipLines(date.charAt(0).toUpperCase() + date.slice(1), c) : `${date.charAt(0).toUpperCase() + date.slice(1)}\nSin comidas libres` }, svg);
+    el('rect', { x: cx, y: cy, width: cell, height: cellH, rx: 8, class: `heat h${Math.min(3, t)}${future ? ' future' : ''}${iso === today ? ' today' : ''}` }, g);
+    el('text', { x: cx + 6, y: cy + 14, class: t >= 2 ? 'daynum dark' : 'daynum' }, g).textContent = d;
+    // secondary encoding: one tiny dot per part logged that day
+    PARTS.filter(([k]) => c[k]).forEach(([k], j) => {
+      el('circle', { cx: cx + cell - 8 - j * 7, cy: cy + cellH - 8, r: 2.5, fill: t >= 2 ? 'var(--ink-deep)' : PART_COLOR[k] }, g);
+    });
+    if (t) rows.push([d, c.comida, c.alcohol, c.postre, fmtThirds(t)]);
+  }
+  tableFrom(['Día', 'Comida', 'Alcohol', 'Postre', 'Total'], rows, 'Comidas libres por día');
+}
+
+function tableFrom(head, rows, caption) {
+  const esc = (v) => String(v).replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch]));
+  $('chartTable').innerHTML = `<caption>${esc(caption)}</caption><tr>${head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr>`
+    + rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('');
+}
+
+function showMarkTip(ev) {
+  const g = ev.target.closest && ev.target.closest('[data-tip]');
+  if (!g) { hideTip(); return; }
+  const tip = $('chartTip');
+  const [title, ...lines] = g.getAttribute('data-tip').split('\n');
+  tip.innerHTML = '';
+  tip.append(Object.assign(document.createElement('b'), { textContent: title }),
+    ...lines.map((l) => Object.assign(document.createElement('span'), { textContent: l })));
+  tip.hidden = false;
+  // follow the finger: beside it horizontally, just above it vertically
+  const wrap = $('chart').getBoundingClientRect();
+  const px = ev.clientX - wrap.left, py = ev.clientY - wrap.top;
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  tip.style.left = `${px + 16 + w <= wrap.width ? px + 16 : Math.max(0, px - 16 - w)}px`;
+  tip.style.top = `${Math.max(-h - 4, py - h - 12)}px`;
+}
+
+function onChartPointer(ev) {
+  if (chartView() === 'acum') showTip(ev); else showMarkTip(ev);
+}
+$('chart').addEventListener('pointermove', onChartPointer);
+$('chart').addEventListener('pointerdown', onChartPointer);
 $('chart').addEventListener('pointerleave', hideTip);
 
 $('moPrev').onclick = () => { monthRef = new Date(monthRef.getFullYear(), monthRef.getMonth() - 1, 1); renderMonth(); };
