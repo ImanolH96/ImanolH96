@@ -326,7 +326,7 @@ function weekStatus(used, quota, finished) {
   if (!used) return { key: 'clean', icon: '★', label: 'Semana limpia' };
   if (used < quota) return { key: 'good', icon: '✓', label: finished ? 'Dentro del plan' : 'Vas bien' };
   if (used === quota) return { key: 'limit', icon: '=', label: 'Al límite' };
-  return { key: 'over', icon: '!', label: `Te pasaste por ${fmtThirds(used - quota)}` };
+  return { key: 'over', icon: '!', label: `${fmtThirds(used - quota)} sobre el cupo` };
 }
 
 function statusPill(st) {
@@ -363,7 +363,7 @@ function renderWeek() {
   $('punch').className = `punch s-${st.key}`;
   if (!current) {
     big.append(fmtThirds(used), Object.assign(document.createElement('small'), {
-      textContent: left < 0 ? `de ${quota / 3} permitidas, te pasaste por ${fmtThirds(-left)}` : `de ${quota / 3} comidas libres usadas`,
+      textContent: left < 0 ? `de ${quota / 3} comidas libres de la semana` : `de ${quota / 3} comidas libres usadas`,
     }));
   } else if (left >= 0) {
     big.append(fmtThirds(left), Object.assign(document.createElement('small'), {
@@ -371,7 +371,7 @@ function renderWeek() {
     }));
   } else {
     big.append('+' + fmtThirds(-left), Object.assign(document.createElement('small'), {
-      textContent: 'por encima de lo permitido',
+      textContent: 'sobre el cupo de la semana',
     }));
   }
 
@@ -481,7 +481,7 @@ function renderMonth() {
   const allowedSoFar = Math.round(((Number(state.settings.quota) || 0) * daysSoFar / 7) * 3);
   let mst;
   if (!total) mst = { key: 'clean', icon: '★', label: 'Mes limpio' };
-  else if (total > allowed) mst = { key: 'over', icon: '!', label: `Te pasaste por ${fmtThirds(total - allowed)}` };
+  else if (total > allowed) mst = { key: 'over', icon: '!', label: 'Por encima del límite' };
   else if (total > allowedSoFar) mst = { key: 'limit', icon: '=', label: 'Por encima del ritmo' };
   else mst = { key: 'good', icon: '✓', label: isCur ? 'Vas bien' : 'Dentro del plan' };
   $('monthTotal').append(
@@ -537,10 +537,11 @@ function renderMonth() {
 function monthAdvice(used, allowed, daysLeft, lastDate) {
   const quota = (Number(state.settings.quota) || 0) * 3;
   const left = allowed - used;
-  const endLabel = `el ${lastDate.getDate()}`;
   const dias = daysLeft === 1 ? 'hoy' : `los ${daysLeft} días que faltan`;
-  if (left < 0) return `Te pasaste ${fmtThirds(-left)} en el mes. Sin comidas libres hasta ${endLabel} evitás que crezca el desvío.`;
-  if (left === 0) return `Ya usaste todo lo del mes. Lo ideal es no sumar más hasta ${endLabel}.`;
+  const next = new Date(lastDate.getFullYear(), lastDate.getMonth() + 1, 1);
+  const restart = `El 1 de ${MONTH(next)} arranca un mes nuevo.`;
+  if (left < 0) return `Este mes ya estás ${fmtThirds(-left)} por encima del límite. ${restart}`;
+  if (left === 0) return `Llegaste justo al límite del mes. ${restart}`;
   if (daysLeft < 7) return `Te quedan ${fmtThirds(left)} para ${dias} del mes.`;
   const perWeek = Math.floor((left * 7) / daysLeft); // thirds per week, rounded down
   if (perWeek >= quota) return `Te quedan ${fmtThirds(left)} para ${dias}. Podés seguir con tu cupo normal.`;
