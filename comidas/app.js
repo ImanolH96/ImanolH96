@@ -163,6 +163,12 @@ function renderWhen() {
 
 let stripOffset = 0; // weeks back from this week shown in the strip
 
+// Logging is limited to the current month.
+function firstOfMonth() {
+  const d = new Date();
+  return isoDate(new Date(d.getFullYear(), d.getMonth(), 1));
+}
+
 function renderStrip() {
   const ref = new Date();
   ref.setDate(ref.getDate() - 7 * stripOffset);
@@ -170,11 +176,11 @@ function renderStrip() {
   const today = isoDate(new Date());
   const selected = currentDate();
   const start = parseDate(from);
-  const mid = new Date(start); mid.setDate(mid.getDate() + 3);
-  const month = MONTH(mid);
-  $('stripMonth').textContent = month.charAt(0).toUpperCase() + month.slice(1)
-    + (mid.getFullYear() !== new Date().getFullYear() ? ` ${mid.getFullYear()}` : '');
+  const first = firstOfMonth();
+  const month = MONTH(new Date());
+  $('stripMonth').textContent = month.charAt(0).toUpperCase() + month.slice(1);
   $('dayNext').disabled = stripOffset === 0;
+  $('dayPrev').disabled = stripOffset >= weekOffsetOf(first);
   $('dayToday').hidden = selected === today && stripOffset === 0;
 
   const box = $('stripDays');
@@ -187,10 +193,10 @@ function renderStrip() {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'sday' + (iso === today ? ' today' : '');
-    b.disabled = iso > today;
+    b.disabled = iso > today || iso < first;
     b.setAttribute('aria-pressed', String(iso === selected));
     const wd = d.toLocaleDateString('es', { weekday: 'short' }).replace('.', '');
-    b.append(Object.assign(document.createElement('small'), { textContent: wd.charAt(0).toUpperCase() }),
+    b.append(Object.assign(document.createElement('small'), { textContent: iso === today ? 'Hoy' : wd.charAt(0).toUpperCase() }),
       Object.assign(document.createElement('b'), { textContent: d.getDate() }));
     const long = d.toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' });
     const n = list.reduce((t, e) => t + thirdsOf(e), 0);
@@ -203,41 +209,15 @@ function renderStrip() {
 function useDay(v) {
   if (!v) return;
   const today = isoDate(new Date());
-  if (v > today) { toast('Elegí hoy o un día anterior'); return; }
+  if (v > today || v < firstOfMonth()) return;
   if (v === today) { dayOffset = 0; pickedDate = null; pickedMeal = null; } else { dayOffset = null; pickedDate = v; }
   stripOffset = weekOffsetOf(v);
-  closeSheet('daySheet');
   renderWhen();
   renderPad();
 }
 
-// The month name opens a sheet for far-away dates: recent days as buttons plus a visible
-// date field (an invisible date input over a button doesn't open the picker on iOS).
-$('dayBtn').onclick = () => {
-  const grid = $('dayGrid');
-  grid.innerHTML = '';
-  const current = currentDate();
-  for (let i = 0; i <= 8; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const iso = isoDate(d);
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.setAttribute('aria-pressed', String(iso === current));
-    const wd = i === 0 ? 'hoy' : i === 1 ? 'ayer' : d.toLocaleDateString('es', { weekday: 'long' });
-    b.append(wd.charAt(0).toUpperCase() + wd.slice(1),
-      Object.assign(document.createElement('small'), { textContent: d.toLocaleDateString('es', { day: 'numeric', month: 'short' }) }));
-    b.onclick = () => useDay(iso);
-    grid.appendChild(b);
-  }
-  $('dayPick').max = isoDate(new Date());
-  $('dayPick').value = current;
-  openSheet('daySheet');
-};
-$('dayUse').onclick = () => useDay($('dayPick').value);
-
-// ‹ › browse weeks in the strip (never past this week); "Hoy" jumps back
-$('dayPrev').onclick = () => { stripOffset += 1; renderStrip(); };
+// ‹ › browse the month's weeks in the strip; "Hoy" jumps back
+$('dayPrev').onclick = () => { stripOffset = Math.min(weekOffsetOf(firstOfMonth()), stripOffset + 1); renderStrip(); };
 $('dayNext').onclick = () => { stripOffset = Math.max(0, stripOffset - 1); renderStrip(); };
 $('dayToday').onclick = () => useDay(isoDate(new Date()));
 
