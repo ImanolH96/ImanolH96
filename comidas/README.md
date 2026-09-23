@@ -7,7 +7,7 @@ Todo corre en el dispositivo: sin servidor, sin cuentas, sin backend. Funciona o
 
 En Registrar, una tarjeta con barra de progreso de la semana ("Usaste ⅔ de 2 comidas libres", marcas en cada comida libre y lo que excede el cupo en rojo). Al pasar el cupo semanal se muestra cupo + extra, ej. "2+⅔".
 
-Tres pestañas abajo: **Registrar** (abre siempre en el día de hoy; se puede cambiar a ayer u otro día), **Semana** y **Mes**. Exportar/importar Excel está en ⚙️ Ajustes.
+Cuatro pestañas abajo: **Registrar** (abre siempre en el día de hoy; se puede cambiar a ayer u otro día), **Semana**, **Mes** y **Planificar**. Exportar/importar Excel está en ⚙️ Ajustes.
 
 - **Botonera de un toque**: 🍔 Comida fuera del plan, 🍷 Alcohol y 🍰 Dulce. Cada tecla suma ⅓; las tres juntas son una comida libre.
 - Tecla principal **🍽️ Comida libre completa** (arriba, grande, en lavanda): registra 1 comida libre entera como registro propio (se suma a las partes que haya en ese momento) (también se puede activar desde el detalle de un registro con "Contar como comida libre completa"). En gráficas aparece en lavanda y el Excel tiene la columna "Completa".
@@ -26,6 +26,15 @@ Tres pestañas abajo: **Registrar** (abre siempre en el día de hoy; se puede ca
 - Detalle opcional: tocando un registro se puede agregar qué fue y notas, cambiar día/hora/partes o borrarlo.
 - **Exportar a Excel (.xlsx)** con dos hojas: `Comidas` (una columna Sí/No por parte y el valor, ej. 0.67) y `Resumen semanal`. En iPhone abre el menú Compartir → "Guardar en Archivos", WhatsApp, mail, etc.
 - **Importar desde Excel**: lee la hoja `Comidas` (podés editarla en Numbers/Excel y volver a cargarla). Te deja reemplazar todo o combinar.
+
+## Planificar
+
+- Reservá comidas libres que ya sabés que vienen (cumpleaños, eventos, salidas) con atajos de un toque, día, momento y valor (⅓, ⅔ o 1).
+- Balance del mes: usadas + reservadas (rayado) + libres para imprevistos, contra el límite del mes.
+- Semana por semana: si lo reservado entra en el cupo o cuánto se pasaría.
+- El día del evento aparece en Registrar con un botón para registrarlo; los que ya pasaron quedan con "Registrar".
+- Lo reservado también se ve rayado en la barra de la semana y se descuenta en el ajuste del mes. El Excel suma la hoja `Planificados`.
+- Próximo paso: importar eventos de Google Calendar (ver abajo).
 
 ## Cómo instalarla en el iPhone
 

@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '31';
+const APP_VERSION = '32';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -39,6 +39,7 @@ function load() {
     if (raw) data = JSON.parse(raw);
   } catch (e) { /* fall through to defaults */ }
   data = data || { settings: { quota: 2, weekStart: 1 }, entries: [] };
+  data.plans = data.plans || []; // planned free meals: birthdays, events… { id, fecha, momento, nombre, valor (thirds) }
   data.settings.ranges = { ...DEFAULT_RANGES, ...data.settings.ranges };
   // Entries from before partial counting were full free meals.
   for (const e of data.entries) {
@@ -371,8 +372,8 @@ const mealsWord = (n) => `${n} ${n === 1 ? 'comida libre' : 'comidas libres'}`;
 
 // Progress bar in thirds: a tick at every whole free meal, a marker at the quota,
 // and the part above the quota drawn in the "over" color.
-function progressBar(used, quota) {
-  const max = Math.max(quota, used, 3);
+function progressBar(used, quota, reserved = 0) {
+  const max = Math.max(quota, used + reserved, 3);
   const bar = document.createElement('span');
   bar.className = 'pbar';
   const pct = (v) => `${(v / max) * 100}%`;
@@ -381,8 +382,11 @@ function progressBar(used, quota) {
   if (used > quota) {
     bar.appendChild(Object.assign(document.createElement('i'), { className: 'fill extra', style: `left:${pct(quota)};width:${pct(used - quota)}` }));
   }
+  if (reserved) {
+    bar.appendChild(Object.assign(document.createElement('i'), { className: 'fill reserved', style: `left:${pct(used)};width:${pct(reserved)}` }));
+  }
   for (let v = 3; v < max; v += 3) {
-    bar.appendChild(Object.assign(document.createElement('i'), { className: v === quota && used > quota ? 'tick cupo' : 'tick', style: `left:${pct(v)}` }));
+    bar.appendChild(Object.assign(document.createElement('i'), { className: v === quota && used + reserved > quota ? 'tick cupo' : 'tick', style: `left:${pct(v)}` }));
   }
   return bar;
 }
@@ -540,11 +544,14 @@ function renderToday() {
   head.className = 'head';
   head.append(Object.assign(document.createElement('small'), { textContent: 'Esta semana' }), statusPill(st));
   const text = left < 0 ? `Usaste ${fmtThirds(quota)} + ${fmtThirds(-left)} extra` : `Usaste ${fmtThirds(used)} de ${mealsWord(quota / 3)}`;
-  const note = left > 0 ? `Te quedan ${fmtThirds(left)}` : left === 0 ? 'Cupo completo' : `Cupo semanal: ${quota / 3}`;
-  box.append(head, Object.assign(document.createElement('b'), { textContent: text }), progressBar(used, quota),
+  const reserved = plannedBetween(isoDate(new Date()), to);
+  let note = left > 0 ? `Te quedan ${fmtThirds(left)}` : left === 0 ? 'Cupo completo' : `Cupo semanal: ${quota / 3}`;
+  if (reserved) note += `, ${fmtThirds(reserved)} reservado para eventos`;
+  box.append(head, Object.assign(document.createElement('b'), { textContent: text }), progressBar(used, quota, reserved),
     Object.assign(document.createElement('small'), { className: 'note', textContent: note }));
   box.setAttribute('aria-label', `Esta semana: ${text}. ${note}. ${st.label}. Ver semana`);
 
+  renderTodayPlans();
   const fecha = currentDate();
   const list = $('dayList');
   list.innerHTML = '';
@@ -561,7 +568,7 @@ function renderToday() {
 
 // ---------- tabs ----------
 
-const TAB_TITLES = { hoy: 'Registrar', semana: 'Semana', mes: 'Mes' };
+const TAB_TITLES = { hoy: 'Registrar', semana: 'Semana', mes: 'Mes', plan: 'Planificar' };
 function showTab(t) {
   for (const k of Object.keys(TAB_TITLES)) {
     $(`tab-${k}`).hidden = k !== t;
@@ -608,7 +615,12 @@ function renderMonth() {
   );
   $('monthStatus').innerHTML = '';
   $('monthStatus').appendChild(statusPill(mst));
-  $('monthAdvice').textContent = isCur ? monthAdvice(total, allowed, new Date(y, m + 1, 0).getDate() - now.getDate() + 1, new Date(y, m + 1, 0)) : '';
+  const reservedMonth = isCur ? plannedBetween(isoDate(now), last) : 0;
+  // what's left counts the events already planned for the rest of the month
+  $('monthAdvice').textContent = isCur
+    ? monthAdvice(total + reservedMonth, allowed, new Date(y, m + 1, 0).getDate() - now.getDate() + 1, new Date(y, m + 1, 0))
+      + (reservedMonth ? ` Ya descuenta ${fmtThirds(reservedMonth)} reservado para eventos.` : '')
+    : '';
 
   renderChart(y, m, inMonth);
 
@@ -1052,6 +1064,7 @@ function render() {
   renderList();
   renderToday();
   renderMonth();
+  renderPlan();
 }
 
 // ---------- sheets ----------
@@ -1228,6 +1241,10 @@ async function exportXlsx() {
   XLSX.utils.book_append_sheet(wb, ws, 'Comidas');
   XLSX.utils.book_append_sheet(wb, ws2, 'Resumen semanal');
   XLSX.utils.book_append_sheet(wb, ws3, 'Resumen mensual');
+  const ws4 = XLSX.utils.json_to_sheet([...state.plans].sort((a, b) => a.fecha.localeCompare(b.fecha)).map((p) => ({
+    'Fecha': p.fecha, 'Momento': p.momento, 'Evento': p.nombre, 'Valor (comidas libres)': Math.round((p.valor / 3) * 100) / 100,
+  })), { header: ['Fecha', 'Momento', 'Evento', 'Valor (comidas libres)'] });
+  XLSX.utils.book_append_sheet(wb, ws4, 'Planificados');
   const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
   const name = `comidas-libres-${isoDate(new Date())}.xlsx`;
   const type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -1327,6 +1344,254 @@ $('fileInput').onchange = async (ev) => {
   if (f) importXlsx(f).catch(() => toast('No se pudo leer el archivo'));
 };
 
+
+
+// ---------- Planificar: free meals you already know are coming (birthdays, events) ----------
+
+const PRESETS = [
+  ['🎂', 'Cumpleaños', 3, 'Cena'],
+  ['🎉', 'Evento', 3, 'Cena'],
+  ['🍽️', 'Salida a comer', 3, 'Cena'],
+  ['🍻', 'After', 1, 'Merienda'],
+];
+let planMonth = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })();
+let editingPlan = null;
+let planValor = 3;
+
+// planned thirds between two ISO dates (inclusive)
+function plannedBetween(from, to) {
+  return state.plans.filter((p) => p.fecha >= from && p.fecha <= to).reduce((n, p) => n + p.valor, 0);
+}
+
+function planIcon(p) {
+  const hit = PRESETS.find(([, name]) => p.nombre.toLowerCase().startsWith(name.toLowerCase().slice(0, 5)));
+  return hit ? hit[0] : '📌';
+}
+
+function renderPlan() {
+  if (!$('planMonthTitle')) return;
+  const y = planMonth.getFullYear(), m = planMonth.getMonth();
+  const now = new Date();
+  const today = isoDate(now);
+  const isCur = y === now.getFullYear() && m === now.getMonth();
+  const first = isoDate(new Date(y, m, 1));
+  const last = isoDate(new Date(y, m + 1, 0));
+  const days = new Date(y, m + 1, 0).getDate();
+  const title = MONTH(planMonth);
+  $('planMonthTitle').textContent = title.charAt(0).toUpperCase() + title.slice(1) + (y !== now.getFullYear() ? ` ${y}` : '');
+  $('planPrev').disabled = isCur;
+  const limit = new Date(now.getFullYear(), now.getMonth() + 6, 1);
+  $('planNext').disabled = planMonth >= limit;
+
+  // month budget: allowed vs used (logged) vs reserved (planned, not logged yet)
+  const quota = Number(state.settings.quota) || 0;
+  const allowed = Math.round(((quota * days) / 7) * 3);
+  const used = state.entries.filter((e) => e.fecha >= first && e.fecha <= last).reduce((n, e) => n + thirdsOf(e), 0);
+  const reserved = plannedBetween(first, last);
+  const free = allowed - used - reserved;
+  const card = $('planBudget');
+  card.innerHTML = '';
+  card.className = 'plan-budget ' + (free < 0 ? 's-over' : free === 0 ? 's-limit' : 's-good');
+  const big = document.createElement('p');
+  big.className = 'plan-free';
+  big.append(Object.assign(document.createElement('b'), { textContent: free >= 0 ? fmtThirds(free) : `+${fmtThirds(-free)}` }),
+    Object.assign(document.createElement('span'), {
+      textContent: free > 0 ? 'libres para imprevistos' : free === 0 ? 'el mes queda justo con lo reservado' : 'por encima del límite del mes con lo reservado',
+    }));
+  const bar = progressBar(used, allowed, reserved);
+  const legend = document.createElement('p');
+  legend.className = 'plan-legend';
+  const item = (cls, label, v) => {
+    const it = document.createElement('span');
+    it.append(Object.assign(document.createElement('i'), { className: cls }), `${label} ${fmtThirds(v)}`);
+    return it;
+  };
+  legend.append(item('lg-used', 'Usadas', used), item('lg-res', 'Reservadas', reserved), item('lg-free', 'Límite', allowed));
+  card.append(big, bar, legend);
+
+  // week by week: does each week fit its quota with what's planned?
+  const wl = $('planWeeks');
+  wl.innerHTML = '';
+  let [from, to] = weekBounds(parseDate(first));
+  while (from <= last) {
+    if (to >= today) {
+      const u = thirdsBetween(from, to);
+      const r = plannedBetween(from > today ? from : today, to);
+      const q = quota * 3;
+      const li = document.createElement('li');
+      const over = u + r - q;
+      const st = over > 0 ? { key: 'over', icon: '!', label: `Se pasa por ${fmtThirds(over)}` }
+        : over === 0 && (u || r) ? { key: 'limit', icon: '=', label: 'Justo en el cupo' }
+        : { key: 'good', icon: '✓', label: `Quedan ${fmtThirds(-over)}` };
+      li.className = `pw s-${st.key}`;
+      li.append(Object.assign(document.createElement('span'), { className: 'pw-range', textContent: weekRangeLabel(from, to, true) }),
+        progressBar(u, q, r), statusPill(st));
+      wl.appendChild(li);
+    }
+    const n = parseDate(from); n.setDate(n.getDate() + 7); from = isoDate(n);
+    const t = new Date(n); t.setDate(t.getDate() + 6); to = isoDate(t);
+  }
+
+  // the events themselves
+  const list = $('planList');
+  list.innerHTML = '';
+  const mine = state.plans.filter((p) => p.fecha >= first && p.fecha <= last).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  if (!mine.length) {
+    list.appendChild(Object.assign(document.createElement('li'), { className: 'empty', textContent: 'Nada planificado este mes. Sumá cumpleaños, eventos o salidas que ya sabés que vienen.' }));
+  }
+  for (const p of mine) list.appendChild(planRow(p));
+  // past events not registered yet, from any month
+  const pending = state.plans.filter((p) => p.fecha < today && (p.fecha < first || p.fecha > last));
+  $('planPendingWrap').hidden = !pending.length || !isCur;
+  const pl = $('planPending');
+  pl.innerHTML = '';
+  for (const p of pending) pl.appendChild(planRow(p));
+}
+
+function planRow(p) {
+  const today = isoDate(new Date());
+  const li = document.createElement('li');
+  li.className = 'prow';
+  const d = parseDate(p.fecha);
+  const date = document.createElement('span');
+  date.className = 'pdate' + (p.fecha === today ? ' today' : '');
+  date.append(Object.assign(document.createElement('small'), { textContent: d.toLocaleDateString('es', { weekday: 'short' }).replace('.', '') }),
+    Object.assign(document.createElement('b'), { textContent: d.getDate() }));
+  const main = document.createElement('button');
+  main.type = 'button';
+  main.className = 'pmain';
+  main.onclick = () => openPlan(p.id);
+  main.append(Object.assign(document.createElement('b'), { textContent: `${planIcon(p)} ${p.nombre}` }),
+    Object.assign(document.createElement('span'), { textContent: `${p.momento}, ${p.valor === 3 ? '1 comida libre' : `${fmtThirds(p.valor)} de comida libre`}` }));
+  li.append(date, main);
+  if (p.fecha <= today) {
+    const reg = Object.assign(document.createElement('button'), { type: 'button', className: 'preg', textContent: 'Registrar' });
+    reg.onclick = () => registerPlan(p.id);
+    li.appendChild(reg);
+  } else {
+    li.appendChild(Object.assign(document.createElement('span'), { className: 'pval', textContent: fmtThirds(p.valor) }));
+  }
+  return li;
+}
+
+// Turn a planned event into a logged free meal (1 → a whole meal, ⅓/⅔ → parts).
+function registerPlan(id) {
+  const p = state.plans.find((x) => x.id === id);
+  if (!p) return;
+  const before = JSON.stringify({ entries: state.entries, plans: state.plans });
+  state.entries.push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    fecha: p.fecha,
+    hora: state.settings.ranges[p.momento] || '21:00',
+    momento: p.momento,
+    partes: { comida: p.valor >= 1 && p.valor < 3, alcohol: p.valor === 2, postre: false },
+    completa: p.valor === 3,
+    descripcion: p.nombre,
+    lugar: '',
+    disfrute: 0,
+    notas: '',
+  });
+  state.plans = state.plans.filter((x) => x !== p);
+  persist();
+  hurt(p.valor, null, p.valor >= 3);
+  render();
+  toast(`${p.nombre} registrado`, () => {
+    const b = JSON.parse(before);
+    state.entries = b.entries;
+    state.plans = b.plans;
+    persist();
+    render();
+    toast('Deshecho');
+  });
+}
+
+// Registrar tab: a nudge when today has a planned event
+function renderTodayPlans() {
+  const box = $('todayPlans');
+  if (!box) return;
+  const today = isoDate(new Date());
+  const mine = state.plans.filter((p) => p.fecha === today);
+  box.hidden = !mine.length;
+  box.innerHTML = '';
+  for (const p of mine) {
+    const row = document.createElement('div');
+    row.className = 'tplan';
+    row.append(Object.assign(document.createElement('span'), { textContent: `Hoy: ${planIcon(p)} ${p.nombre} (${fmtThirds(p.valor)})` }));
+    const b = Object.assign(document.createElement('button'), { type: 'button', textContent: 'Registrar' });
+    b.onclick = () => registerPlan(p.id);
+    row.appendChild(b);
+    box.appendChild(row);
+  }
+}
+
+// ---- plan sheet ----
+function renderPlanSheet() {
+  const pre = $('planPresets');
+  pre.innerHTML = '';
+  for (const [icon, name, valor, momento] of PRESETS) {
+    const b = Object.assign(document.createElement('button'), { type: 'button', textContent: `${icon} ${name}` });
+    b.onclick = () => {
+      $('pName').value = name;
+      planValor = valor;
+      $('pMeal').value = momento;
+      renderPlanValor();
+      $('pName').focus();
+    };
+    pre.appendChild(b);
+  }
+  renderPlanValor();
+}
+function renderPlanValor() {
+  const box = $('planValor');
+  box.innerHTML = '';
+  for (const [v, label] of [[1, '⅓'], [2, '⅔'], [3, '1 completa']]) {
+    const b = Object.assign(document.createElement('button'), { type: 'button', textContent: label });
+    b.setAttribute('aria-pressed', String(planValor === v));
+    b.onclick = () => { planValor = v; renderPlanValor(); };
+    box.appendChild(b);
+  }
+}
+function openPlan(id) {
+  const p = id ? state.plans.find((x) => x.id === id) : null;
+  editingPlan = p ? p.id : null;
+  $('planSheetTitle').textContent = p ? 'Editar evento' : 'Nuevo evento';
+  $('pName').value = p ? p.nombre : '';
+  const now = new Date();
+  const def = p ? p.fecha : isoDate(planMonth > now ? planMonth : now);
+  $('pDate').min = isoDate(now);
+  $('pDate').value = def;
+  $('pMeal').innerHTML = MEALS.map((m) => `<option${m === (p ? p.momento : 'Cena') ? ' selected' : ''}>${m}</option>`).join('');
+  planValor = p ? p.valor : 3;
+  $('pDelete').hidden = !p;
+  renderPlanSheet();
+  openSheet('planSheet');
+}
+$('planAdd').onclick = () => openPlan(null);
+$('planForm').addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  const nombre = $('pName').value.trim() || 'Evento';
+  const fecha = $('pDate').value;
+  if (!fecha) { toast('Elegí la fecha del evento'); return; }
+  const data = { fecha, momento: $('pMeal').value, nombre, valor: planValor };
+  if (editingPlan) Object.assign(state.plans.find((x) => x.id === editingPlan), data);
+  else state.plans.push({ id: 'p' + Date.now().toString(36), ...data });
+  const d = parseDate(fecha);
+  planMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+  persist();
+  closeSheet('planSheet');
+  render();
+  toast(editingPlan ? 'Evento actualizado' : `${nombre} reservado`);
+});
+$('pDelete').onclick = () => {
+  const before = JSON.stringify(state.plans);
+  state.plans = state.plans.filter((x) => x.id !== editingPlan);
+  persist();
+  closeSheet('planSheet');
+  render();
+  toast('Evento borrado', () => { state.plans = JSON.parse(before); persist(); render(); toast('Deshecho'); });
+};
+$('planPrev').onclick = () => { planMonth = new Date(planMonth.getFullYear(), planMonth.getMonth() - 1, 1); renderPlan(); };
+$('planNext').onclick = () => { planMonth = new Date(planMonth.getFullYear(), planMonth.getMonth() + 1, 1); renderPlan(); };
 
 // ---------- "damage" feedback when a free meal is added ----------
 
