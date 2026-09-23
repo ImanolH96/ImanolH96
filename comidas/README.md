@@ -32,7 +32,8 @@ Cuatro pestañas abajo: **Registrar** (abre siempre en el día de hoy; se puede 
 
 - Reservá comidas libres que ya sabés que vienen (cumpleaños, eventos, salidas) con atajos de un toque, día, momento y valor (⅓, ⅔ o 1).
 - Balance del mes: usadas + reservadas (rayado) + libres para imprevistos, contra el límite del mes.
-- Semana por semana: si lo reservado entra en el cupo o cuánto se pasaría.
+- "Te quedan" grande con una ficha por comida libre del mes (en tercios: usadas, reservadas, libres) y la cuenta del mes.
+- **Repartí lo que queda**: asigná con − / + a cada semana que falta cuánto pensás usar; muestra lo usado, reservado y asignado contra el cupo semanal, lo que queda sin repartir, "Repartir parejo" (hasta el cupo de cada semana) y "Borrar reparto". El plan de la semana aparece en Registrar.
 - El día del evento aparece en Registrar con un botón para registrarlo; los que ya pasaron quedan con "Registrar".
 - Lo reservado también se ve rayado en la barra de la semana y se descuenta en el ajuste del mes. El Excel suma la hoja `Planificados`.
 - **Buscar eventos en Google Calendar** (conexión directa, solo lectura): ver "Conectar Google Calendar" abajo.

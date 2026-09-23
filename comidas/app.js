@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '39';
+const APP_VERSION = '40';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -39,6 +39,7 @@ function load() {
     if (raw) data = JSON.parse(raw);
   } catch (e) { /* fall through to defaults */ }
   data = data || { settings: { quota: 2, weekStart: 1 }, entries: [] };
+  data.alloc = data.alloc || {}; // playground: thirds assigned per week { 'YYYY-MM-DD' (week start): thirds }
   data.plans = data.plans || []; // planned free meals: birthdays, events… { id, fecha, momento, nombre, valor (thirds) }
   data.settings.ranges = { ...DEFAULT_RANGES, ...data.settings.ranges };
   // Entries from before partial counting were full free meals.
@@ -570,6 +571,8 @@ function renderToday() {
   const reserved = plannedBetween(isoDate(new Date()), to);
   let note = left > 0 ? `Te quedan ${fmtThirds(left)}` : left === 0 ? 'Cupo completo' : `Cupo semanal: ${quota / 3}`;
   if (reserved) note += `, ${fmtThirds(reserved)} reservado para eventos`;
+  const planned = state.alloc[from];
+  if (planned) note += `. Tu plan: ${fmtThirds(planned)} más`;
   box.append(head, Object.assign(document.createElement('b'), { textContent: text }), progressBar(used, quota, reserved),
     Object.assign(document.createElement('small'), { className: 'note', textContent: note }));
   box.setAttribute('aria-label', `Esta semana: ${text}. ${note}. ${st.label}. Ver semana`);
@@ -1414,46 +1417,25 @@ function renderPlan() {
   const used = state.entries.filter((e) => e.fecha >= first && e.fecha <= last).reduce((n, e) => n + thirdsOf(e), 0);
   const reserved = plannedBetween(first, last);
   const free = allowed - used - reserved;
+  const monthName = MONTH(planMonth);
   const card = $('planBudget');
   card.innerHTML = '';
   card.className = 'plan-budget ' + (free < 0 ? 's-over' : free === 0 ? 's-limit' : 's-good');
-  const big = document.createElement('p');
+  const big = document.createElement('div');
   big.className = 'plan-free';
-  big.append(Object.assign(document.createElement('b'), { textContent: free >= 0 ? fmtThirds(free) : `+${fmtThirds(-free)}` }),
+  big.append(Object.assign(document.createElement('small'), { textContent: free >= 0 ? 'Te quedan' : 'Con lo reservado quedás' }),
+    Object.assign(document.createElement('b'), { textContent: free >= 0 ? fmtThirds(free) : `+${fmtThirds(-free)}` }),
     Object.assign(document.createElement('span'), {
-      textContent: free > 0 ? 'libres para imprevistos' : free === 0 ? 'el mes queda justo con lo reservado' : 'por encima del límite del mes con lo reservado',
+      textContent: free < 0 ? `por encima del límite de ${monthName}` : `${free === 3 ? 'comida libre' : free > 0 && free < 3 ? 'de comida libre' : 'comidas libres'} en ${monthName}`,
     }));
-  const bar = progressBar(used, allowed, reserved);
-  const legend = document.createElement('p');
-  legend.className = 'plan-legend';
-  const item = (cls, label, v) => {
-    const it = document.createElement('span');
-    it.append(Object.assign(document.createElement('i'), { className: cls }), `${label} ${fmtThirds(v)}`);
-    return it;
-  };
-  legend.append(item('lg-used', 'Usadas', used), item('lg-res', 'Reservadas', reserved), item('lg-free', 'Límite', allowed));
-  const note = Object.assign(document.createElement('p'), { className: 'plan-span', textContent: `${span.weeks.length} semanas × ${quota} = ${fmtThirds(allowed)}, del ${spanLabel(span)}` });
-  card.append(big, bar, legend, note);
+  card.append(big, mealTokens(allowed, used, reserved));
+  const math = document.createElement('p');
+  math.className = 'plan-math';
+  math.textContent = `${fmtThirds(allowed)} del mes − ${fmtThirds(used)} usadas − ${fmtThirds(reserved)} reservadas = ${free < 0 ? '−' + fmtThirds(-free) : fmtThirds(free)}`;
+  const note = Object.assign(document.createElement('p'), { className: 'plan-span', textContent: `${span.weeks.length} semanas × ${quota}, del ${spanLabel(span)}` });
+  card.append(math, note);
 
-  // week by week: does each week fit its quota with what's planned?
-  const wl = $('planWeeks');
-  wl.innerHTML = '';
-  for (const [from, to] of span.weeks) {
-    if (to >= today) {
-      const u = thirdsBetween(from, to);
-      const r = plannedBetween(from > today ? from : today, to);
-      const q = quota * 3;
-      const li = document.createElement('li');
-      const over = u + r - q;
-      const st = over > 0 ? { key: 'over', icon: '!', label: `Se pasa por ${fmtThirds(over)}` }
-        : over === 0 && (u || r) ? { key: 'limit', icon: '=', label: 'Justo en el cupo' }
-        : { key: 'good', icon: '✓', label: `Quedan ${fmtThirds(-over)}` };
-      li.className = `pw s-${st.key}`;
-      li.append(Object.assign(document.createElement('span'), { className: 'pw-range', textContent: weekRangeLabel(from, to, true) }),
-        progressBar(u, q, r), statusPill(st));
-      wl.appendChild(li);
-    }
-  }
+  renderPlayground(span, today, free);
 
   const synced = state.settings.gcalLastSync;
   $('gcalNote').textContent = synced
@@ -1501,6 +1483,147 @@ function planRow(p) {
   }
   return li;
 }
+
+
+// One token per whole free meal of the month, split in thirds: used, reserved, free (and red extra).
+function mealTokens(allowed, used, reserved) {
+  const box = document.createElement('div');
+  box.className = 'tokens';
+  box.setAttribute('aria-hidden', 'true');
+  const total = Math.max(allowed, used + reserved);
+  const kinds = [];
+  for (let i = 0; i < used; i++) kinds.push('used');
+  for (let i = 0; i < reserved; i++) kinds.push('res');
+  while (kinds.length < total) kinds.push('free');
+  const ns = 'http://www.w3.org/2000/svg';
+  for (let c = 0; c < Math.ceil(total / 3); c++) {
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 48 48');
+    const extra = c * 3 >= allowed;
+    const ring = document.createElementNS(ns, 'circle');
+    ring.setAttribute('cx', 24); ring.setAttribute('cy', 24); ring.setAttribute('r', 21);
+    ring.setAttribute('class', 'tk-ring' + (extra ? ' extra' : ''));
+    svg.appendChild(ring);
+    for (let i = 0; i < 3; i++) {
+      const k = kinds[c * 3 + i];
+      if (!k || k === 'free') continue;
+      const w = document.createElementNS(ns, 'path');
+      w.setAttribute('d', wedgePath(i));
+      w.setAttribute('class', `tk-${k}` + (c * 3 + i >= allowed ? ' over' : ''));
+      svg.appendChild(w);
+    }
+    for (let i = 0; i < 3; i++) {
+      const a = (-90 + i * 120) * Math.PI / 180;
+      const l = document.createElementNS(ns, 'line');
+      l.setAttribute('x1', 24); l.setAttribute('y1', 24);
+      l.setAttribute('x2', (24 + 21 * Math.cos(a)).toFixed(2)); l.setAttribute('y2', (24 + 21 * Math.sin(a)).toFixed(2));
+      l.setAttribute('class', 'tk-div');
+      svg.appendChild(l);
+    }
+    box.appendChild(svg);
+  }
+  const lg = document.createElement('div');
+  lg.className = 'tk-legend';
+  lg.innerHTML = '<span><i class="lg-used"></i>Usadas</span><span><i class="lg-res"></i>Reservadas</span><span><i class="lg-free"></i>Libres</span>';
+  const wrap = document.createElement('div');
+  wrap.append(box, lg);
+  return wrap;
+}
+
+// ---- playground: hand out the month's free meals to the weeks that are left ----
+function renderPlayground(span, today, free) {
+  const box = $('playWeeks');
+  box.innerHTML = '';
+  const q = (Number(state.settings.quota) || 0) * 3;
+  const weeks = span.weeks.filter(([, to]) => to >= today);
+  const assigned = weeks.reduce((n, [from]) => n + (state.alloc[from] || 0), 0);
+  const pool = free - assigned;
+  $('playPool').textContent = pool >= 0 ? `Sin repartir: ${fmtThirds(pool)}` : `Repartiste ${fmtThirds(-pool)} de más`;
+  $('playPool').className = 'status ' + (pool < 0 ? 's-over' : pool === 0 ? 's-limit' : 's-good');
+  $('playBlock').hidden = !weeks.length;
+  for (const [from, to] of weeks) {
+    const u = thirdsBetween(from, to);
+    const r = plannedBetween(from > today ? from : today, to);
+    const a = state.alloc[from] || 0;
+    const tot = u + r + a;
+    const li = document.createElement('li');
+    li.className = 'pg' + (tot > q ? ' over' : '');
+    const head = document.createElement('div');
+    head.className = 'pg-head';
+    const cur = from <= today && today <= to;
+    head.append(Object.assign(document.createElement('b'), { textContent: (cur ? 'Esta semana, ' : '') + weekRangeLabel(from, to, true) }),
+      Object.assign(document.createElement('span'), {
+        className: 'pg-total',
+        textContent: `${fmtThirds(tot)} de ${q / 3}` + (tot > q ? ` (+${fmtThirds(tot - q)})` : ''),
+      }));
+    // bar: used + reserved + assigned against the weekly quota
+    const max = Math.max(q, tot, 3);
+    const bar = document.createElement('span');
+    bar.className = 'pbar pg-bar';
+    const pct = (v) => `${(v / max) * 100}%`;
+    let x = 0;
+    for (const [cls, v] of [['fill used', u], ['fill reserved', r], ['fill alloc', a]]) {
+      if (!v) continue;
+      bar.appendChild(Object.assign(document.createElement('i'), { className: cls, style: `left:${pct(x)};width:${pct(v)}` }));
+      x += v;
+    }
+    for (let v = 3; v < max; v += 3) bar.appendChild(Object.assign(document.createElement('i'), { className: v === q ? 'tick cupo' : 'tick', style: `left:${pct(v)}` }));
+    const step = document.createElement('div');
+    step.className = 'pg-step';
+    const minus = Object.assign(document.createElement('button'), { type: 'button', textContent: '−', disabled: !a });
+    minus.setAttribute('aria-label', `Sacar ⅓ de la semana del ${weekRangeLabel(from, to)}`);
+    minus.onclick = () => { setAlloc(from, a - 1); };
+    const val = Object.assign(document.createElement('span'), { className: 'pg-val', textContent: a ? fmtThirds(a) : '0' });
+    const plus = Object.assign(document.createElement('button'), { type: 'button', textContent: '+', disabled: pool <= 0 });
+    plus.setAttribute('aria-label', `Asignar ⅓ a la semana del ${weekRangeLabel(from, to)}`);
+    plus.onclick = () => { setAlloc(from, a + 1); };
+    const lbl = Object.assign(document.createElement('small'), { textContent: (u || r) ? `${u ? `usadas ${fmtThirds(u)}` : ''}${u && r ? ', ' : ''}${r ? `reservadas ${fmtThirds(r)}` : ''}` : 'sin nada todavía' });
+    step.append(lbl, minus, val, plus);
+    li.append(head, bar, step);
+    box.appendChild(li);
+  }
+}
+
+function setAlloc(from, v) {
+  if (v > 0) state.alloc[from] = v; else delete state.alloc[from];
+  persist();
+  renderPlan();
+  renderToday();
+}
+
+$('playEven').onclick = () => {
+  const y = planMonth.getFullYear(), m = planMonth.getMonth();
+  const span = monthSpan(y, m);
+  const today = isoDate(new Date());
+  const q = (Number(state.settings.quota) || 0) * 3;
+  const weeks = span.weeks.filter(([, to]) => to >= today).map(([from, to]) => from);
+  if (!weeks.length) return;
+  for (const w of weeks) delete state.alloc[w];
+  const used = state.entries.filter((e) => e.fecha >= span.from && e.fecha <= span.to).reduce((n, e) => n + thirdsOf(e), 0);
+  let pool = monthAllowance(y, m) - used - plannedBetween(span.from, span.to);
+  // one third at a time to the week with the most room, never past a week's quota
+  const end = (w) => { const d = parseDate(w); d.setDate(d.getDate() + 6); return isoDate(d); };
+  const room = (w) => q - (thirdsBetween(w, end(w)) + plannedBetween(w > today ? w : today, end(w)) + (state.alloc[w] || 0));
+  while (pool > 0) {
+    const w = weeks.reduce((best, x) => (room(x) > room(best) ? x : best), weeks[0]);
+    if (room(w) <= 0) break;
+    state.alloc[w] = (state.alloc[w] || 0) + 1;
+    pool--;
+  }
+  persist();
+  renderPlan();
+  renderToday();
+  toast(pool > 0 ? `Repartido hasta el cupo de cada semana; quedan ${fmtThirds(pool)} sin repartir` : 'Repartido entre las semanas que quedan');
+};
+$('playClear').onclick = () => {
+  const span = monthSpan(planMonth.getFullYear(), planMonth.getMonth());
+  const before = JSON.stringify(state.alloc);
+  for (const [from] of span.weeks) delete state.alloc[from];
+  persist();
+  renderPlan();
+  renderToday();
+  toast('Reparto borrado', () => { state.alloc = JSON.parse(before); persist(); renderPlan(); renderToday(); toast('Deshecho'); });
+};
 
 // Turn a planned event into a logged free meal (1 → a whole meal, ⅓/⅔ → parts).
 function registerPlan(id) {
