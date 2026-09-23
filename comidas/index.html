@@ -161,47 +161,32 @@
   }
   .seg button[aria-pressed="true"] { background: var(--paper); color: var(--ink); border-color: var(--paper); }
 
-  /* ---------- the keypad ---------- */
-  .pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-  .key {
-    --c: var(--comida); --d: var(--comida-deep);
-    position: relative; border: 0; border-radius: 18px; background: var(--c); color: var(--ink-deep);
-    min-height: 92px; padding: 10px 6px 8px;
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-    box-shadow: 0 5px 0 var(--d); transform: translateY(0);
-    transition: transform .06s, box-shadow .06s;
-    touch-action: manipulation; user-select: none; -webkit-user-select: none;
-  }
-  .key[data-part="alcohol"] { --c: var(--alcohol); --d: var(--alcohol-deep); color: #fff; }
-  .key[data-part="postre"] { --c: var(--postre); --d: var(--postre-deep); }
-  .key:active, .key.pressed { transform: translateY(4px); box-shadow: 0 1px 0 var(--d); }
-  .key .emoji { font-size: 30px; line-height: 1; }
-  .key .name { font-size: 15px; font-weight: 700; line-height: 1.1; text-align: center; }
-  .key .val {
-    position: absolute; top: 6px; left: 8px; font-size: 12px; font-weight: 800; line-height: 1.3;
-    background: var(--ink-deep); color: var(--paper); border-radius: 999px; padding: 0 7px;
-  }
-  .key .done {
-    position: absolute; top: 6px; right: 8px; font-size: 12px; font-weight: 700;
-    background: var(--ink-deep); color: var(--paper); border-radius: 999px; padding: 1px 7px;
-  }
-
-  /* the whole free meal is the main key */
-  .key.hero {
-    --c: var(--completa); --d: var(--completa-deep);
-    grid-column: 1 / -1; min-height: 132px; border-radius: 24px;
-    flex-direction: row; justify-content: flex-start; gap: 16px; padding: 18px 22px;
-    box-shadow: 0 8px 0 var(--d), 0 14px 30px rgb(181 140 255 / .25);
-  }
-  .key.hero:active, .key.hero.pressed { transform: translateY(6px); box-shadow: 0 2px 0 var(--d); }
-  .key.hero .emoji { font-size: 56px; }
-  .key.hero .txt { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left; }
-  .key.hero .name { font-size: 23px; font-weight: 800; text-align: left; line-height: 1.05; }
-  .key.hero small { font-size: 14px; font-weight: 600; opacity: .8; }
-  .key.hero .done { top: 12px; right: 14px; font-size: 14px; padding: 2px 9px; }
-  .pad-label { grid-column: 1 / -1; margin: 6px 0 -2px; font-size: 14px; color: var(--muted); }
-  .pad-label b { color: var(--paper); }
-  .hint { margin: -16px 0 0; font-size: 14px; color: var(--muted); text-align: center; }
+  /* ---------- the keypad: a Simon-style dial — the three thirds around, the whole meal in the middle ---------- */
+  .pad { display: flex; justify-content: center; }
+  .dial { width: min(100%, 290px); height: auto; display: block; overflow: visible; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  .key { cursor: pointer; outline: none; -webkit-tap-highlight-color: transparent; }
+  .key .top { transition: transform .07s ease-out; }
+  .key.pressed .top { transform: translateY(5px); }
+  .key .face { transition: filter .15s; }
+  .key.pressed .face { filter: brightness(1.25) saturate(1.1); }
+  .key[data-part="comida"] .face { fill: var(--comida); } .key[data-part="comida"] .base { fill: var(--comida-deep); }
+  .key[data-part="alcohol"] .face { fill: var(--alcohol); } .key[data-part="alcohol"] .base { fill: var(--alcohol-deep); }
+  .key[data-part="postre"] .face { fill: var(--postre); } .key[data-part="postre"] .base { fill: var(--postre-deep); }
+  .key.hub .face { fill: var(--completa); } .key.hub .base { fill: var(--completa-deep); }
+  .key.on .face { stroke: var(--paper); stroke-width: 4; }
+  .key:focus-visible .face { stroke: var(--paper); stroke-width: 4; stroke-dasharray: 6 4; }
+  .key text { text-anchor: middle; font-family: var(--font); pointer-events: none; }
+  .key .emo { font-size: 30px; }
+  .key .emo.big { font-size: 40px; }
+  .key .nm { font-size: 15px; font-weight: 800; fill: var(--ink-deep); }
+  .key[data-part="alcohol"] .nm { fill: #fff; }
+  .key .pill rect { fill: var(--ink-deep); }
+  .key .pill text { font-size: 12px; font-weight: 800; fill: var(--paper); }
+  .key .done { display: none; }
+  .key.on .done { display: inline; }
+  .key .done circle { fill: var(--ink-deep); stroke: var(--paper); stroke-width: 2; }
+  .key .done text { font-size: 12px; font-weight: 800; fill: var(--paper); }
+  .hint { margin: -10px 0 0; font-size: 14px; color: var(--muted); text-align: center; }
 
   /* ---------- log ---------- */
   .log h2 { margin: 0 0 6px; font-size: 18px; font-weight: 700; }
@@ -511,13 +496,50 @@
   </section>
 
   <section class="pad" id="pad" aria-label="Registrar">
-    <button class="key hero" data-part="completa" type="button"><span class="emoji">🍽️</span><span class="txt"><span class="name">Comida libre completa</span><small>Suma 1 comida libre</small></span></button>
-    <p class="pad-label">O por partes, <b>⅓</b> cada una</p>
-    <button class="key" data-part="comida" type="button"><span class="emoji">🍔</span><span class="name">Comida</span><span class="val">⅓</span></button>
-    <button class="key" data-part="alcohol" type="button"><span class="emoji">🍷</span><span class="name">Alcohol</span><span class="val">⅓</span></button>
-    <button class="key" data-part="postre" type="button"><span class="emoji">🍰</span><span class="name">Dulce</span><span class="val">⅓</span></button>
+    <svg class="dial" viewBox="0 -4 300 314" role="group" aria-label="Sumar comida libre">
+      <g class="key seg" data-part="comida" role="button" tabindex="0" aria-label="Sumar comida">
+        <path class="base" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z" transform="translate(0 6)"/>
+        <g class="top">
+          <path class="face" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/>
+          <text class="emo" x="150.0" y="27.0">🍔</text>
+          <text class="nm" x="150.0" y="49.0">Comida</text>
+          <g class="pill"><rect x="137.0" y="55.0" width="26" height="17" rx="8.5"/><text x="150.0" y="67.5">⅓</text></g>
+          <g class="done"><circle cx="233.6" cy="50.4" r="11"/><text x="233.6" y="54.9">✓</text></g>
+        </g>
+      </g>
+      <g class="key seg" data-part="alcohol" role="button" tabindex="0" aria-label="Sumar alcohol">
+        <path class="base" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z" transform="translate(0 6)"/>
+        <g class="top">
+          <path class="face" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/>
+          <text class="emo" x="249.6" y="199.5">🍷</text>
+          <text class="nm" x="249.6" y="221.5">Alcohol</text>
+          <g class="pill"><rect x="236.6" y="227.5" width="26" height="17" rx="8.5"/><text x="249.6" y="240.0">⅓</text></g>
+          <g class="done"><circle cx="277.2" cy="123.0" r="11"/><text x="277.2" y="127.5">✓</text></g>
+        </g>
+      </g>
+      <g class="key seg" data-part="postre" role="button" tabindex="0" aria-label="Sumar dulce">
+        <path class="base" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z" transform="translate(0 6)"/>
+        <g class="top">
+          <path class="face" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/>
+          <text class="emo" x="50.4" y="199.5">🍰</text>
+          <text class="nm" x="50.4" y="221.5">Dulce</text>
+          <g class="pill"><rect x="37.4" y="227.5" width="26" height="17" rx="8.5"/><text x="50.4" y="240.0">⅓</text></g>
+          <g class="done"><circle cx="109.8" cy="273.6" r="11"/><text x="109.8" y="278.1">✓</text></g>
+        </g>
+      </g>
+      <g class="key hub" data-part="completa" role="button" tabindex="0" aria-label="Sumar comida libre completa">
+        <circle class="base" cx="150" cy="156" r="66"/>
+        <g class="top">
+          <circle class="face" cx="150" cy="150" r="66"/>
+          <text class="emo big" x="150" y="138">🍽️</text>
+          <text class="nm" x="150" y="164">Completa</text>
+          <g class="pill"><rect x="137" y="171" width="26" height="17" rx="8.5"/><text x="150" y="183.5">1</text></g>
+          <g class="done"><circle cx="194" cy="106" r="11"/><text x="194" y="110.5">✓</text></g>
+        </g>
+      </g>
+    </svg>
   </section>
-  <p class="hint">Otro toque en la misma tecla lo saca.</p>
+  <p class="hint">El centro suma una comida libre completa; cada parte del anillo suma ⅓. Otro toque la saca.</p>
 
     <section class="log">
       <h2 id="dayTitle">Registros de hoy</h2>

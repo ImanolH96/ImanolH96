@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '41';
+const APP_VERSION = '42';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -249,18 +249,11 @@ function renderPad() {
   const whole = occasion(currentDate(), currentMeal(), true);
   for (const key of $('pad').querySelectorAll('.key')) {
     const part = key.dataset.part;
-    let badge = key.querySelector('.done');
     const on = part === 'completa' ? !!whole : !!(occ && occ.partes[part]);
-    if (on && !badge) {
-      badge = document.createElement('span');
-      badge.className = 'done';
-      badge.textContent = '✓';
-      key.appendChild(badge);
-    } else if (!on && badge) {
-      badge.remove();
-    }
+    key.classList.toggle('on', on);
     const label = SERIES.find(([k]) => k === part)[1];
-    key.setAttribute('aria-label', on ? `${label}: sumado. Tocá para sacarlo` : `Sumar ${label.toLowerCase()}`);
+    key.setAttribute('aria-pressed', String(on));
+    key.setAttribute('aria-label', on ? `${label}: sumado. Tocá para sacarlo` : `Sumar ${part === 'completa' ? 'comida libre completa' : label.toLowerCase()}`);
   }
 }
 
@@ -289,7 +282,7 @@ function tap(part) {
     if (empty) state.entries = state.entries.filter((e) => e !== occ);
     persist();
     render();
-    toast(whole ? `${noun} sacada de ${where}` : empty ? `Registro de ${where} borrado` : `${noun} sacado de ${where}`, undo);
+    toast((whole ? `${noun} sacada de ${where}` : empty ? `Registro de ${where} borrado` : `${noun} sacado de ${where}`).replace(' de el ', ' del '), undo);
     return;
   }
   if (occ) {
@@ -316,8 +309,20 @@ function tap(part) {
   toast(`${noun} ${whole ? 'sumada' : 'sumado'} a ${where}`.replace(' a el ', ' al '), undo);
 }
 
+// the dial's parts are SVG groups: press feedback by hand, keyboard like a button
 for (const key of $('pad').querySelectorAll('.key')) {
-  key.addEventListener('click', () => tap(key.dataset.part));
+  const press = (on) => key.classList.toggle('pressed', on);
+  key.addEventListener('pointerdown', () => press(true));
+  key.addEventListener('pointerup', () => press(false));
+  key.addEventListener('pointerleave', () => press(false));
+  key.addEventListener('pointercancel', () => press(false));
+  key.addEventListener('click', () => {
+    tap(key.dataset.part);
+    key.querySelector('.face').animate([{ filter: 'brightness(1.7)' }, { filter: 'none' }], { duration: 350, easing: 'ease-out' });
+  });
+  key.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); key.dispatchEvent(new MouseEvent('click')); }
+  });
 }
 
 // ---------- week punch card ----------
