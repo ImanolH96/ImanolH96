@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '43';
+const APP_VERSION = '44';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -317,8 +317,11 @@ for (const key of $('pad').querySelectorAll('.key')) {
   key.addEventListener('pointerleave', () => press(false));
   key.addEventListener('pointercancel', () => press(false));
   key.addEventListener('click', () => {
-    tap(key.dataset.part);
-    key.querySelector('.face').animate([{ filter: 'brightness(1.7)' }, { filter: 'none' }], { duration: 350, easing: 'ease-out' });
+    // show the new state in the same frame as the tap; logging, toast and redraws follow right after
+    key.classList.toggle('on');
+    key.classList.remove('pressed');
+    key.querySelector('.face').animate([{ opacity: 0.7 }, { opacity: 1 }], { duration: 220, easing: 'ease-out' });
+    requestAnimationFrame(() => setTimeout(() => tap(key.dataset.part), 0));
   });
   key.addEventListener('keydown', (ev) => {
     if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); key.dispatchEvent(new MouseEvent('click')); }
@@ -652,6 +655,8 @@ function showTab(t) {
     $(`tb-${k}`).setAttribute('aria-selected', String(k === t));
   }
   $('tabTitle').textContent = TAB_TITLES[t];
+  currentTab = t;
+  renderTab(t);
   hideTip();
   window.scrollTo(0, 0);
 }
@@ -1133,14 +1138,17 @@ $('wkPrev').onclick = () => goWeek(weekOffset + 1);
 $('wkNext').onclick = () => goWeek(weekOffset - 1);
 $('wkToday').onclick = () => goWeek(0);
 
+// Only the visible tab is redrawn; the others redraw when they're opened (see showTab).
+let currentTab = 'hoy';
+function renderTab(t) {
+  if (t === 'semana') { renderWeek(); renderList(); }
+  else if (t === 'mes') renderMonth();
+  else if (t === 'plan') renderPlan();
+}
 function render() {
-  renderWeek();
   renderWhen();
-  renderPad();
-  renderList();
-  renderToday();
-  renderMonth();
-  renderPlan();
+  renderPad(); // also redraws the Registrar summary and day list
+  renderTab(currentTab);
 }
 
 // ---------- sheets ----------

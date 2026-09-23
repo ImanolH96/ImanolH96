@@ -165,12 +165,17 @@
   .pad { display: flex; justify-content: center; }
   .dial { width: min(100%, 290px); height: auto; display: block; overflow: visible; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
   .key { cursor: pointer; outline: none; -webkit-tap-highlight-color: transparent; }
-  .key .top { transition: transform .12s cubic-bezier(.3, 1.4, .5, 1); }
-  .key.pressed .top { transform: translateY(5px); transition-duration: .05s; }
+  .key .top { transition: transform .1s cubic-bezier(.3, 1.4, .5, 1); will-change: transform; }
+  .key.pressed .top { transform: translateY(5px); transition-duration: 0s; }
   /* latched (already added): sunk to the base, darker, inner shadow — like a pressed-in button */
   .key.on .top { transform: translateY(5px); }
   .key.on.pressed .top { transform: translateY(7px); }
-  .key.on .face { filter: url(#pressedIn); }
+  .key .shade { fill: url(#shadeGrad); opacity: 0; pointer-events: none; }
+  .key.on .shade { opacity: 1; }
+  .key.on[data-part="comida"] .face { fill: #b9871f; }
+  .key.on[data-part="alcohol"] .face { fill: #a3325a; }
+  .key.on[data-part="postre"] .face { fill: #cf7fa4; }
+  .key.on.hub .face { fill: #8a63d6; }
   .key.on .emo { opacity: .85; }
   .key .face { transition: filter .15s; }
   .key.pressed .face { filter: brightness(1.25) saturate(1.1); }
@@ -502,23 +507,17 @@
   <section class="pad" id="pad" aria-label="Registrar">
     <svg class="dial" viewBox="0 -4 300 314" role="group" aria-label="Sumar comida libre">
       <defs>
-        <!-- latched state: the part sinks, darkens and gets an inner shadow along its top edge -->
-        <filter id="pressedIn" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
-          <feComponentTransfer in="SourceGraphic" result="dark">
-            <feFuncR type="linear" slope="0.74"/><feFuncG type="linear" slope="0.74"/><feFuncB type="linear" slope="0.74"/>
-          </feComponentTransfer>
-          <feFlood flood-color="#000" flood-opacity="0.6"/>
-          <feComposite in2="SourceAlpha" operator="out"/>
-          <feOffset dy="5"/>
-          <feGaussianBlur stdDeviation="3.5" result="shadow"/>
-          <feComposite in="shadow" in2="SourceAlpha" operator="in" result="inner"/>
-          <feMerge><feMergeNode in="dark"/><feMergeNode in="inner"/></feMerge>
-        </filter>
+        <!-- latched state: a static inner shadow along the top edge (cheap to paint, no filters) -->
+        <linearGradient id="shadeGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#000" stop-opacity="0.5"/>
+          <stop offset="0.28" stop-color="#000" stop-opacity="0.12"/>
+          <stop offset="0.6" stop-color="#000" stop-opacity="0"/>
+        </linearGradient>
       </defs>
       <g class="key seg" data-part="comida" role="button" tabindex="0" aria-label="Sumar comida">
         <path class="base" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z" transform="translate(0 6)"/>
         <g class="top">
-          <path class="face" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/>
+          <path class="face" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/><path class="shade" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/>
           <text class="emo" x="150.0" y="27.0">🍔</text>
           <text class="nm" x="150.0" y="49.0">Comida</text>
           <g class="pill"><rect x="137.0" y="55.0" width="26" height="17" rx="8.5"/><text x="150.0" y="67.5">⅓</text></g>
@@ -528,7 +527,7 @@
       <g class="key seg" data-part="alcohol" role="button" tabindex="0" aria-label="Sumar alcohol">
         <path class="base" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z" transform="translate(0 6)"/>
         <g class="top">
-          <path class="face" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/>
+          <path class="face" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/><path class="shade" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/>
           <text class="emo" x="249.6" y="199.5">🍷</text>
           <text class="nm" x="249.6" y="221.5">Alcohol</text>
           <g class="pill"><rect x="236.6" y="227.5" width="26" height="17" rx="8.5"/><text x="249.6" y="240.0">⅓</text></g>
@@ -538,7 +537,7 @@
       <g class="key seg" data-part="postre" role="button" tabindex="0" aria-label="Sumar dulce">
         <path class="base" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z" transform="translate(0 6)"/>
         <g class="top">
-          <path class="face" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/>
+          <path class="face" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/><path class="shade" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/>
           <text class="emo" x="50.4" y="199.5">🍰</text>
           <text class="nm" x="50.4" y="221.5">Dulce</text>
           <g class="pill"><rect x="37.4" y="227.5" width="26" height="17" rx="8.5"/><text x="50.4" y="240.0">⅓</text></g>
@@ -548,7 +547,7 @@
       <g class="key hub" data-part="completa" role="button" tabindex="0" aria-label="Sumar comida libre completa">
         <circle class="base" cx="150" cy="156" r="66"/>
         <g class="top">
-          <circle class="face" cx="150" cy="150" r="66"/>
+          <circle class="face" cx="150" cy="150" r="66"/><circle class="shade" cx="150" cy="150" r="66"/>
           <text class="emo big" x="150" y="138">🍽️</text>
           <text class="nm" x="150" y="164">Completa</text>
           <g class="pill"><rect x="137" y="171" width="26" height="17" rx="8.5"/><text x="150" y="183.5">1</text></g>
