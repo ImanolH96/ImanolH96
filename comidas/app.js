@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '46';
+const APP_VERSION = '47';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -321,6 +321,24 @@ const haptic = (() => {
   label.append(sw); document.body.append(label);
   return () => label.click();
 })();
+
+// the dial's soft shadows, faked without SVG filters (they lag on iOS): many thin copies of the key's
+// shape, each a touch wider and nearly transparent, stack into a smooth falloff instead of visible bands
+for (const key of $('pad').querySelectorAll('.key')) {
+  const shape = key.querySelector('.face');
+  const stack = (group, maxWidth, alpha) => {
+    for (let w = maxWidth; w >= 2; w -= 2) {
+      const layer = shape.cloneNode();
+      layer.removeAttribute('class');
+      layer.setAttribute('stroke-width', w);
+      layer.setAttribute('opacity', alpha);
+      group.append(layer);
+    }
+  };
+  stack(key.querySelector('.soft'), 24, 0.022);        // contact shadow under the resting cap
+  stack(key.querySelector('.hole .blur'), 20, 0.06);   // the hole's inner walls
+  stack(key.querySelector('.inset .blur'), 30, 0.035); // inner shadow on a latched cap
+}
 
 // the dial's parts are SVG groups: press feedback by hand, keyboard like a button
 for (const key of $('pad').querySelectorAll('.key')) {
