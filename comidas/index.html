@@ -190,16 +190,14 @@
   .key .edge > * { fill: none; stroke-width: 5; pointer-events: none; }
   .key .edge .hi { stroke: url(#bevelHi); } .key .edge .lo { stroke: url(#bevelLo); }
   .key .edge { transition: opacity .16s; }
-  .key.on .gloss { opacity: .15; } .key.on .edge { opacity: 0; }
+  .key.on .gloss { opacity: 0; } .key.on .edge { opacity: 0; }
   .key .inset { opacity: 0; pointer-events: none; transition: opacity .12s; }
   .key .inset .lipsh { fill: url(#lip); }
   .key.on .inset { opacity: 1; }
-  .key.on[data-part="comida"] .face { fill: #cf9727; }
-  .key.on[data-part="alcohol"] .face { fill: #b53c66; }
-  .key.on[data-part="postre"] .face { fill: #e091b5; }
-  .key.on.hub .face { fill: #9a70e6; }
-  .key.on .emo { opacity: .82; }
-  .key.on .nm, .key.on .pill { opacity: .85; }
+  .key.on[data-part="comida"] .face { fill: #e9ab35; }
+  .key.on[data-part="alcohol"] .face { fill: #cc4270; }
+  .key.on[data-part="postre"] .face { fill: #efa0c3; }
+  .key.on.hub .face { fill: #aa82f6; }
   .key .face { transition: filter .15s; }
   .key.pressed .face { filter: brightness(1.12); transition-duration: 0s; }
   .key[data-part="comida"] .face { fill: var(--comida); } .key[data-part="comida"] .base { fill: var(--comida-deep); }
@@ -555,9 +553,9 @@
           <stop offset="1" stop-color="#000" stop-opacity="0.35"/>
         </linearGradient>
         <linearGradient id="lip" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#000" stop-opacity="0.6"/>
-          <stop offset="0.22" stop-color="#000" stop-opacity="0.22"/>
-          <stop offset="0.5" stop-color="#000" stop-opacity="0"/>
+          <stop offset="0" stop-color="#000" stop-opacity="0.3"/>
+          <stop offset="0.12" stop-color="#000" stop-opacity="0.08"/>
+          <stop offset="0.25" stop-color="#000" stop-opacity="0"/>
         </linearGradient>
         <clipPath id="cp-comida"><path d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/></clipPath>
         <clipPath id="cp-alcohol"><path d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/></clipPath>

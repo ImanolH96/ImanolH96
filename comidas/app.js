@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '47';
+const APP_VERSION = '48';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -336,8 +336,8 @@ for (const key of $('pad').querySelectorAll('.key')) {
     }
   };
   stack(key.querySelector('.soft'), 24, 0.022);        // contact shadow under the resting cap
-  stack(key.querySelector('.hole .blur'), 20, 0.06);   // the hole's inner walls
-  stack(key.querySelector('.inset .blur'), 30, 0.035); // inner shadow on a latched cap
+  stack(key.querySelector('.hole .blur'), 10, 0.07);   // the hole's inner walls
+  stack(key.querySelector('.inset .blur'), 12, 0.05);  // inner shadow on a latched cap
 }
 
 // the dial's parts are SVG groups: press feedback by hand, keyboard like a button
