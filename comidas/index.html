@@ -485,6 +485,13 @@
   .pw .pbar { grid-column: 1 / -1; grid-row: 2; }
   .pw .status { grid-column: 2; grid-row: 1; font-size: 13px; padding-block: 2px; }
   .pw .status i { width: 20px; height: 20px; }
+  .backup { display: flex; align-items: center; gap: 10px; margin-top: -12px; padding: 8px 6px 8px 14px;
+    border-radius: 14px; background: var(--panel); border: 1.5px dashed var(--line); }
+  .backup-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .backup-text b { font-size: 14px; font-weight: 700; }
+  .backup-text small { font-size: 13px; color: var(--muted); }
+  .backup-go { flex: none; border: 0; border-radius: 10px; background: var(--paper); color: var(--ink-deep); font-weight: 800; padding: 8px 12px; }
+  .backup-x { flex: none; border: 0; background: none; color: var(--muted); font-size: 16px; width: 36px; height: 36px; border-radius: 10px; }
   .today-plans { display: flex; flex-direction: column; gap: 8px; margin-top: -12px; }
   .tplan { display: flex; align-items: center; justify-content: space-between; gap: 10px;
     border: 1.5px solid var(--completa); border-radius: 14px; padding: 8px 8px 8px 14px; font-weight: 600; }
@@ -534,6 +541,11 @@
   <div class="tab" id="tab-hoy" role="tabpanel" aria-labelledby="tb-hoy">
     <button class="today-sum" id="todaySummary" type="button"></button>
     <div class="today-plans" id="todayPlans" hidden></div>
+    <div class="backup" id="backupNudge" role="status" hidden>
+      <span class="backup-text"><b></b><small>Guardá un Excel en Archivos por si se borran.</small></span>
+      <button class="backup-go" id="backupExport" type="button">Exportar</button>
+      <button class="backup-x" id="backupLater" type="button" aria-label="Recordarme en una semana">✕</button>
+    </div>
   <section class="when">
     <div class="strip" role="group" aria-label="Día">
       <div class="strip-head">

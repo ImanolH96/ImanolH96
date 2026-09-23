@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '54';
+const APP_VERSION = '55';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -749,6 +749,7 @@ function renderToday() {
   box.setAttribute('aria-label', `Esta semana: ${said}, usaste ${fmtThirds(used)}. ${notes.join('. ')} ${st.label}. Ver semana`);
 
   renderTodayPlans();
+  renderBackup();
   const fecha = currentDate();
   const list = $('dayList');
   list.innerHTML = '';
@@ -1462,6 +1463,7 @@ async function exportXlsx() {
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
       await navigator.share({ files: [file], title: name });
+      markExported();
       return;
     } catch (err) {
       if (err.name === 'AbortError') return;
@@ -1475,7 +1477,38 @@ async function exportXlsx() {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+  markExported();
 }
+
+// ---------- backup nudge: the data only lives on this phone, so ask for a copy every 4 weeks ----------
+
+const BACKUP_DAYS = 28;
+function markExported() {
+  state.settings.lastExport = isoDate(new Date());
+  persist();
+  renderBackup();
+}
+function renderBackup() {
+  const box = $('backupNudge');
+  const today = isoDate(new Date());
+  const first = state.entries.reduce((m, e) => (e.fecha < m ? e.fecha : m), today);
+  const since = state.settings.lastExport || first;
+  const days = Math.round((parseDate(today) - parseDate(since)) / 864e5);
+  const snoozed = state.settings.backupSnooze && state.settings.backupSnooze > today;
+  box.hidden = !state.entries.length || days < BACKUP_DAYS || snoozed;
+  if (box.hidden) return;
+  const weeks = Math.floor(days / 7);
+  box.querySelector('b').textContent = state.settings.lastExport
+    ? `Tu última copia es de hace ${weeks} semanas`
+    : 'Tus registros solo están en este iPhone';
+}
+$('backupExport').onclick = () => exportXlsx().catch(() => toast('No se pudo exportar'));
+$('backupLater').onclick = () => {
+  const d = new Date(); d.setDate(d.getDate() + 7);
+  state.settings.backupSnooze = isoDate(d);
+  persist();
+  renderBackup();
+};
 
 function cellToDate(v) {
   if (v instanceof Date) return isoDate(v);
