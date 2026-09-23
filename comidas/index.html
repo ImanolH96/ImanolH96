@@ -226,6 +226,10 @@
   .key:focus-visible .face { stroke: var(--paper); stroke-width: 4; stroke-dasharray: 6 4; }
   .key text { text-anchor: middle; font-family: var(--font); pointer-events: none; }
   .key .emo { font-size: 23px; }
+  .key .emos .emo { font-size: 38px; opacity: .55; }
+  .key.seg .nm { font-size: 16px; paint-order: stroke; stroke-width: 5px; stroke-linejoin: round; }
+  .key[data-part="comida"] .nm { stroke: var(--comida); } .key[data-part="postre"] .nm { stroke: var(--postre); } .key[data-part="alcohol"] .nm { stroke: var(--alcohol); }
+  .key.on[data-part="comida"] .nm { stroke: color-mix(in srgb, var(--comida), #000 14%); } .key.on[data-part="postre"] .nm { stroke: color-mix(in srgb, var(--postre), #000 14%); } .key.on[data-part="alcohol"] .nm { stroke: color-mix(in srgb, var(--alcohol), #000 14%); }
   .key .emo.big { font-size: 40px; }
   .key .nm { font-size: 15px; font-weight: 800; fill: var(--ink-deep); }
   .key[data-part="alcohol"] .nm { fill: #fff; }
@@ -585,9 +589,9 @@
           <path class="face" d="M41.83 75.66 A14 14 0 0 1 39.13 55.01 A146 146 0 0 1 260.87 55.01 A14 14 0 0 1 258.17 75.66 L222.97 99.85 A9 9 0 0 1 211.01 98.25 A80 80 0 0 0 88.99 98.25 A9 9 0 0 1 77.03 99.85 Z"/><path class="dish" d="M41.83 75.66 A14 14 0 0 1 39.13 55.01 A146 146 0 0 1 260.87 55.01 A14 14 0 0 1 258.17 75.66 L222.97 99.85 A9 9 0 0 1 211.01 98.25 A80 80 0 0 0 88.99 98.25 A9 9 0 0 1 77.03 99.85 Z"/><path class="gloss" d="M41.83 75.66 A14 14 0 0 1 39.13 55.01 A146 146 0 0 1 260.87 55.01 A14 14 0 0 1 258.17 75.66 L222.97 99.85 A9 9 0 0 1 211.01 98.25 A80 80 0 0 0 88.99 98.25 A9 9 0 0 1 77.03 99.85 Z"/>
           <g class="edge" clip-path="url(#cp-comida)"><g class="hi"></g><g class="lo"></g></g>
           <g class="inset" clip-path="url(#cp-comida)"><path class="lipsh" d="M41.83 75.66 A14 14 0 0 1 39.13 55.01 A146 146 0 0 1 260.87 55.01 A14 14 0 0 1 258.17 75.66 L222.97 99.85 A9 9 0 0 1 211.01 98.25 A80 80 0 0 0 88.99 98.25 A9 9 0 0 1 77.03 99.85 Z"/><g class="blur"></g></g>
-          <text class="emo" x="123.0" y="30.0">🍕</text><text class="emo" x="150.0" y="30.0">🍔</text><text class="emo" x="177.0" y="30.0">🌮</text>
-          <text class="nm" x="150.0" y="49.0">Comida</text>
-          <g class="pill"><rect x="137.0" y="55.0" width="26" height="17" rx="8.5"/><text x="150.0" y="67.5">⅓</text></g>
+          <g class="emos"><text class="emo" x="77.4" y="63.4" dy="0.35em" transform="rotate(-14 77.4 63.4)">🍔</text><text class="emo" x="222.6" y="63.4" dy="0.35em" transform="rotate(14 222.6 63.4)">🌮</text></g>
+          <text class="nm" x="150.0" y="38.0">Comida</text>
+          <g class="pill"><rect x="137.0" y="44.0" width="26" height="17" rx="8.5"/><text x="150.0" y="56.5">⅓</text></g>
           <g class="done"><circle cx="233.6" cy="50.4" r="11"/><text x="233.6" y="54.9">✓</text></g>
         </g>
       </g>
@@ -599,9 +603,9 @@
           <path class="face" d="M268.47 93.49 A14 14 0 0 1 287.70 101.48 A146 146 0 0 1 176.83 293.51 A14 14 0 0 1 160.30 280.85 L156.95 238.27 A9 9 0 0 1 164.31 228.71 A80 80 0 0 0 225.32 123.04 A9 9 0 0 1 229.92 111.88 Z"/><path class="dish" d="M268.47 93.49 A14 14 0 0 1 287.70 101.48 A146 146 0 0 1 176.83 293.51 A14 14 0 0 1 160.30 280.85 L156.95 238.27 A9 9 0 0 1 164.31 228.71 A80 80 0 0 0 225.32 123.04 A9 9 0 0 1 229.92 111.88 Z"/><path class="gloss" d="M268.47 93.49 A14 14 0 0 1 287.70 101.48 A146 146 0 0 1 176.83 293.51 A14 14 0 0 1 160.30 280.85 L156.95 238.27 A9 9 0 0 1 164.31 228.71 A80 80 0 0 0 225.32 123.04 A9 9 0 0 1 229.92 111.88 Z"/>
           <g class="edge" clip-path="url(#cp-alcohol)"><g class="hi"></g><g class="lo"></g></g>
           <g class="inset" clip-path="url(#cp-alcohol)"><path class="lipsh" d="M268.47 93.49 A14 14 0 0 1 287.70 101.48 A146 146 0 0 1 176.83 293.51 A14 14 0 0 1 160.30 280.85 L156.95 238.27 A9 9 0 0 1 164.31 228.71 A80 80 0 0 0 225.32 123.04 A9 9 0 0 1 229.92 111.88 Z"/><g class="blur"></g></g>
-          <text class="emo" x="266.4" y="137.8" dy="0.35em">🍺</text><text class="emo" x="265.6" y="168.3" dy="0.35em">🍷</text><text class="emo" x="256.9" y="197.6" dy="0.35em">🍹</text>
-          <text class="nm" x="249.6" y="228.5">Alcohol</text>
-          <g class="pill"><rect x="236.6" y="234.5" width="26" height="17" rx="8.5"/><text x="249.6" y="247.0">⅓</text></g>
+          <g class="emos"><text class="emo" x="261.3" y="130.4" dy="0.35em" transform="rotate(-14 261.3 130.4)">🍷</text><text class="emo" x="188.6" y="256.2" dy="0.35em" transform="rotate(14 188.6 256.2)">🍺</text></g>
+          <text class="nm" x="247.9" y="207.5">Alcohol</text>
+          <g class="pill"><rect x="234.9" y="213.5" width="26" height="17" rx="8.5"/><text x="247.9" y="226.0">⅓</text></g>
           <g class="done"><circle cx="277.2" cy="123.0" r="11"/><text x="277.2" y="127.5">✓</text></g>
         </g>
       </g>
@@ -613,9 +617,9 @@
           <path class="face" d="M139.70 280.85 A14 14 0 0 1 123.17 293.51 A146 146 0 0 1 12.30 101.48 A14 14 0 0 1 31.53 93.49 L70.08 111.88 A9 9 0 0 1 74.68 123.04 A80 80 0 0 0 135.69 228.71 A9 9 0 0 1 143.05 238.27 Z"/><path class="dish" d="M139.70 280.85 A14 14 0 0 1 123.17 293.51 A146 146 0 0 1 12.30 101.48 A14 14 0 0 1 31.53 93.49 L70.08 111.88 A9 9 0 0 1 74.68 123.04 A80 80 0 0 0 135.69 228.71 A9 9 0 0 1 143.05 238.27 Z"/><path class="gloss" d="M139.70 280.85 A14 14 0 0 1 123.17 293.51 A146 146 0 0 1 12.30 101.48 A14 14 0 0 1 31.53 93.49 L70.08 111.88 A9 9 0 0 1 74.68 123.04 A80 80 0 0 0 135.69 228.71 A9 9 0 0 1 143.05 238.27 Z"/>
           <g class="edge" clip-path="url(#cp-postre)"><g class="hi"></g><g class="lo"></g></g>
           <g class="inset" clip-path="url(#cp-postre)"><path class="lipsh" d="M139.70 280.85 A14 14 0 0 1 123.17 293.51 A146 146 0 0 1 12.30 101.48 A14 14 0 0 1 31.53 93.49 L70.08 111.88 A9 9 0 0 1 74.68 123.04 A80 80 0 0 0 135.69 228.71 A9 9 0 0 1 143.05 238.27 Z"/><g class="blur"></g></g>
-          <text class="emo" x="33.6" y="137.8" dy="0.35em">🍫</text><text class="emo" x="34.4" y="168.3" dy="0.35em">🥐</text><text class="emo" x="43.1" y="197.6" dy="0.35em">🍰</text>
-          <text class="nm" x="50.4" y="228.5">Dulce</text>
-          <g class="pill"><rect x="37.4" y="234.5" width="26" height="17" rx="8.5"/><text x="50.4" y="247.0">⅓</text></g>
+          <g class="emos"><text class="emo" x="111.4" y="256.2" dy="0.35em" transform="rotate(-14 111.4 256.2)">🥐</text><text class="emo" x="38.7" y="130.4" dy="0.35em" transform="rotate(14 38.7 130.4)">🍰</text></g>
+          <text class="nm" x="52.1" y="207.5">Dulce</text>
+          <g class="pill"><rect x="39.1" y="213.5" width="26" height="17" rx="8.5"/><text x="52.1" y="226.0">⅓</text></g>
           <g class="done"><circle cx="109.8" cy="273.6" r="11"/><text x="109.8" y="278.1">✓</text></g>
         </g>
       </g>
