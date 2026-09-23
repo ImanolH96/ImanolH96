@@ -165,31 +165,46 @@
   .pad { display: flex; justify-content: center; }
   .dial { width: min(100%, 290px); height: auto; display: block; overflow: visible; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
   .key { cursor: pointer; outline: none; -webkit-tap-highlight-color: transparent; }
-  /* resting: the cap stands 8px over its base, lit from above, casting a shadow.
-     pressed: it drops flush with the base. latched (already added): it stays down inside its
-     dark well — darker, gloss gone, an inner shadow all around the edge and a deep one under the top lip. */
-  .key .top { transition: transform .12s cubic-bezier(.3, 1.5, .5, 1); will-change: transform; transform-box: fill-box; transform-origin: center; }
-  .key.pressed .top { transform: translateY(8px) scale(.98); transition-duration: 0s; }
+  /* A physical keycap, painted without SVG filters (they lag on iOS):
+     resting  — the cap stands 9px over its wall, lit from above (gloss, bright top bevel, dark bottom bevel,
+                slightly dished face) and casts a soft contact shadow (stacked strokes fake the blur).
+     pressed  — while the finger is down it drops flush with the wall, the shadow tucks in.
+     latched  — once added it stays sunk in its dark hole: a hair smaller so the hole's rim shows, the light
+                is gone and a soft inner shadow falls from the top lip. */
+  .key .top { transition: transform .16s cubic-bezier(.25, 1.6, .45, 1); will-change: transform; transform-box: fill-box; transform-origin: center; }
+  .key.pressed .top { transform: translateY(9px) scale(.985); transition: transform .05s ease-out; }
   .key.on .top { transform: translateY(7px) scale(.965); }
-  .key.on.pressed .top { transform: translateY(8px) scale(.95); }
-  .key.on .base { opacity: 0; }
-  .key .well { fill: #0b1030; stroke: #0b1030; stroke-width: 3; stroke-linejoin: round; }
-  .key .drop { fill: #000; opacity: .28; transition: opacity .12s; }
-  .key.on .drop, .key.pressed .drop { opacity: 0; transition-duration: 0s; }
-  .key .gloss { fill: url(#glossGrad); pointer-events: none; transition: opacity .12s; }
-  .key.on .gloss { opacity: 0; }
-  .key .shade { fill: url(#shadeGrad); opacity: 0; pointer-events: none; }
-  .key .rim { fill: none; stroke: #000; stroke-width: 12; opacity: 0; pointer-events: none; }
-  .key.on .shade { opacity: 1; }
-  .key.on .rim { opacity: .38; }
-  .key.on[data-part="comida"] .face { fill: #c28e22; }
-  .key.on[data-part="alcohol"] .face { fill: #ad3861; }
-  .key.on[data-part="postre"] .face { fill: #d88aae; }
-  .key.on.hub .face { fill: #9269dc; }
-  .key.on .emo { opacity: .8; }
+  .key.on.pressed .top { transform: translateY(9px) scale(.955); }
+  .key .soft > * { fill: #000; stroke: #000; stroke-linejoin: round; }
+  .key .soft .s1 { stroke-width: 18; opacity: .05; } .key .soft .s2 { stroke-width: 11; opacity: .06; }
+  .key .soft .s3 { stroke-width: 5; opacity: .08; } .key .soft .s4 { stroke-width: 0; opacity: .12; }
+  .key .soft { transition: opacity .16s, transform .16s; }
+  .key.pressed .soft { opacity: .35; transform: translateY(4px); transition-duration: .05s; }
+  .key.on .soft { opacity: 0; }
+  .key .well { fill: #080c26; stroke: #080c26; stroke-width: 3; stroke-linejoin: round; }
+  .key .hin1, .key .hin2 { fill: none; stroke: #000; }
+  .key .hin1 { stroke-width: 16; opacity: .25; } .key .hin2 { stroke-width: 6; opacity: .35; }
+  .key .sideshade { fill: url(#side); }
+  .key.on .side { opacity: 0; }
+  .key .dish { fill: url(#dish); pointer-events: none; }
+  .key .gloss { fill: url(#gloss); pointer-events: none; transition: opacity .16s; }
+  .key .edge > * { fill: none; stroke-width: 5; pointer-events: none; }
+  .key .edge .hi { stroke: url(#bevelHi); } .key .edge .lo { stroke: url(#bevelLo); }
+  .key .edge { transition: opacity .16s; }
+  .key.on .gloss { opacity: .15; } .key.on .edge { opacity: 0; }
+  .key .inset { opacity: 0; pointer-events: none; transition: opacity .12s; }
+  .key .inset .lipsh { fill: url(#lip); }
+  .key .inset .in1, .key .inset .in2, .key .inset .in3 { fill: none; stroke: #000; }
+  .key .inset .in1 { stroke-width: 26; opacity: .1; } .key .inset .in2 { stroke-width: 14; opacity: .14; } .key .inset .in3 { stroke-width: 5; opacity: .28; }
+  .key.on .inset { opacity: 1; }
+  .key.on[data-part="comida"] .face { fill: #cf9727; }
+  .key.on[data-part="alcohol"] .face { fill: #b53c66; }
+  .key.on[data-part="postre"] .face { fill: #e091b5; }
+  .key.on.hub .face { fill: #9a70e6; }
+  .key.on .emo { opacity: .82; }
   .key.on .nm, .key.on .pill { opacity: .85; }
   .key .face { transition: filter .15s; }
-  .key.pressed .face { filter: brightness(1.2) saturate(1.1); transition-duration: 0s; }
+  .key.pressed .face { filter: brightness(1.12); transition-duration: 0s; }
   .key[data-part="comida"] .face { fill: var(--comida); } .key[data-part="comida"] .base { fill: var(--comida-deep); }
   .key[data-part="alcohol"] .face { fill: var(--alcohol); } .key[data-part="alcohol"] .base { fill: var(--alcohol-deep); }
   .key[data-part="postre"] .face { fill: var(--postre); } .key[data-part="postre"] .base { fill: var(--postre-deep); }
@@ -516,30 +531,50 @@
   </section>
 
   <section class="pad" id="pad" aria-label="Registrar">
-    <svg class="dial" viewBox="0 -4 300 314" role="group" aria-label="Sumar comida libre">
+    <svg class="dial" viewBox="-6 -6 312 326" role="group" aria-label="Sumar comida libre">
       <defs>
-        <!-- resting: light catching the top of the cap -->
-        <linearGradient id="glossGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#fff" stop-opacity="0.38"/>
-          <stop offset="0.35" stop-color="#fff" stop-opacity="0.08"/>
-          <stop offset="0.7" stop-color="#fff" stop-opacity="0"/>
+        <!-- all depth is painted with gradients and stacked strokes, no SVG filters: fast on iOS -->
+        <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#fff" stop-opacity="0.34"/>
+          <stop offset="0.3" stop-color="#fff" stop-opacity="0.1"/>
+          <stop offset="0.62" stop-color="#fff" stop-opacity="0"/>
+          <stop offset="1" stop-color="#000" stop-opacity="0.12"/>
         </linearGradient>
-        <!-- latched: the cap sits in its well, the top lip casts a shadow over it -->
-        <linearGradient id="shadeGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#000" stop-opacity="0.55"/>
-          <stop offset="0.3" stop-color="#000" stop-opacity="0.18"/>
-          <stop offset="0.7" stop-color="#000" stop-opacity="0.05"/>
+        <radialGradient id="dish" cx="0.5" cy="0.45" r="0.6">
+          <stop offset="0.55" stop-color="#000" stop-opacity="0"/>
+          <stop offset="1" stop-color="#000" stop-opacity="0.16"/>
+        </radialGradient>
+        <linearGradient id="bevelHi" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#fff" stop-opacity="0.75"/>
+          <stop offset="0.45" stop-color="#fff" stop-opacity="0.12"/>
+          <stop offset="1" stop-color="#fff" stop-opacity="0"/>
         </linearGradient>
-        <!-- each cap clips its own inner rim shadow (a thick stroke, no filters: fast on iOS) -->
+        <linearGradient id="bevelLo" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0.45" stop-color="#000" stop-opacity="0"/>
+          <stop offset="1" stop-color="#000" stop-opacity="0.35"/>
+        </linearGradient>
+        <linearGradient id="side" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#000" stop-opacity="0"/>
+          <stop offset="1" stop-color="#000" stop-opacity="0.35"/>
+        </linearGradient>
+        <linearGradient id="lip" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#000" stop-opacity="0.6"/>
+          <stop offset="0.22" stop-color="#000" stop-opacity="0.22"/>
+          <stop offset="0.5" stop-color="#000" stop-opacity="0"/>
+        </linearGradient>
         <clipPath id="cp-comida"><path d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/></clipPath>
         <clipPath id="cp-alcohol"><path d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/></clipPath>
         <clipPath id="cp-postre"><path d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/></clipPath>
         <clipPath id="cp-completa"><circle cx="150" cy="150" r="66"/></clipPath>
       </defs>
       <g class="key seg" data-part="comida" role="button" tabindex="0" aria-label="Sumar comida">
-        <path class="well" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/><path class="drop" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z" transform="translate(0 13)"/><path class="base" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z" transform="translate(0 8)"/>
+        <g class="soft" transform="translate(0 11)"><path class="s1" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/><path class="s2" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/><path class="s3" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/><path class="s4" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/></g>
+        <g class="hole"><path class="well" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/><g clip-path="url(#cp-comida)"><path class="hin1" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/><path class="hin2" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/></g></g>
+        <g class="side" transform="translate(0 9)"><path class="base" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/><path class="sideshade" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/></g>
         <g class="top">
-          <path class="face" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/><path class="gloss" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/><path class="shade" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/><path class="rim" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z" clip-path="url(#cp-comida)"/>
+          <path class="face" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/><path class="dish" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/><path class="gloss" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/>
+          <g class="edge" clip-path="url(#cp-comida)"><path class="hi" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/><path class="lo" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/></g>
+          <g class="inset" clip-path="url(#cp-comida)"><path class="lipsh" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/><path class="in1" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/><path class="in2" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/><path class="in3" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z"/></g>
           <text class="emo" x="150.0" y="27.0">🍔</text>
           <text class="nm" x="150.0" y="49.0">Comida</text>
           <g class="pill"><rect x="137.0" y="55.0" width="26" height="17" rx="8.5"/><text x="150.0" y="67.5">⅓</text></g>
@@ -547,9 +582,13 @@
         </g>
       </g>
       <g class="key seg" data-part="alcohol" role="button" tabindex="0" aria-label="Sumar alcohol">
-        <path class="well" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/><path class="drop" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z" transform="translate(0 13)"/><path class="base" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z" transform="translate(0 8)"/>
+        <g class="soft" transform="translate(0 11)"><path class="s1" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/><path class="s2" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/><path class="s3" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/><path class="s4" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/></g>
+        <g class="hole"><path class="well" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/><g clip-path="url(#cp-alcohol)"><path class="hin1" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/><path class="hin2" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/></g></g>
+        <g class="side" transform="translate(0 9)"><path class="base" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/><path class="sideshade" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/></g>
         <g class="top">
-          <path class="face" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/><path class="gloss" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/><path class="shade" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/><path class="rim" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z" clip-path="url(#cp-alcohol)"/>
+          <path class="face" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/><path class="dish" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/><path class="gloss" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/>
+          <g class="edge" clip-path="url(#cp-alcohol)"><path class="hi" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/><path class="lo" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/></g>
+          <g class="inset" clip-path="url(#cp-alcohol)"><path class="lipsh" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/><path class="in1" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/><path class="in2" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/><path class="in3" d="M281.78 87.15 A146 146 0 0 1 161.46 295.55 L156.28 229.75 A80 80 0 0 0 222.21 115.56 Z"/></g>
           <text class="emo" x="249.6" y="199.5">🍷</text>
           <text class="nm" x="249.6" y="221.5">Alcohol</text>
           <g class="pill"><rect x="236.6" y="227.5" width="26" height="17" rx="8.5"/><text x="249.6" y="240.0">⅓</text></g>
@@ -557,9 +596,13 @@
         </g>
       </g>
       <g class="key seg" data-part="postre" role="button" tabindex="0" aria-label="Sumar dulce">
-        <path class="well" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/><path class="drop" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z" transform="translate(0 13)"/><path class="base" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z" transform="translate(0 8)"/>
+        <g class="soft" transform="translate(0 11)"><path class="s1" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/><path class="s2" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/><path class="s3" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/><path class="s4" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/></g>
+        <g class="hole"><path class="well" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/><g clip-path="url(#cp-postre)"><path class="hin1" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/><path class="hin2" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/></g></g>
+        <g class="side" transform="translate(0 9)"><path class="base" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/><path class="sideshade" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/></g>
         <g class="top">
-          <path class="face" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/><path class="gloss" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/><path class="shade" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/><path class="rim" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z" clip-path="url(#cp-postre)"/>
+          <path class="face" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/><path class="dish" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/><path class="gloss" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/>
+          <g class="edge" clip-path="url(#cp-postre)"><path class="hi" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/><path class="lo" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/></g>
+          <g class="inset" clip-path="url(#cp-postre)"><path class="lipsh" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/><path class="in1" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/><path class="in2" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/><path class="in3" d="M138.54 295.55 A146 146 0 0 1 18.22 87.15 L77.79 115.56 A80 80 0 0 0 143.72 229.75 Z"/></g>
           <text class="emo" x="50.4" y="199.5">🍰</text>
           <text class="nm" x="50.4" y="221.5">Dulce</text>
           <g class="pill"><rect x="37.4" y="227.5" width="26" height="17" rx="8.5"/><text x="50.4" y="240.0">⅓</text></g>
@@ -567,9 +610,13 @@
         </g>
       </g>
       <g class="key hub" data-part="completa" role="button" tabindex="0" aria-label="Sumar comida libre completa">
-        <circle class="well" cx="150" cy="150" r="66"/><circle class="drop" cx="150" cy="163" r="66"/><circle class="base" cx="150" cy="158" r="66"/>
+        <g class="soft" transform="translate(0 11)"><circle class="s1" cx="150" cy="150" r="66"/><circle class="s2" cx="150" cy="150" r="66"/><circle class="s3" cx="150" cy="150" r="66"/><circle class="s4" cx="150" cy="150" r="66"/></g>
+        <g class="hole"><circle class="well" cx="150" cy="150" r="66"/><g clip-path="url(#cp-completa)"><circle class="hin1" cx="150" cy="150" r="66"/><circle class="hin2" cx="150" cy="150" r="66"/></g></g>
+        <g class="side" transform="translate(0 9)"><circle class="base" cx="150" cy="150" r="66"/><circle class="sideshade" cx="150" cy="150" r="66"/></g>
         <g class="top">
-          <circle class="face" cx="150" cy="150" r="66"/><circle class="gloss" cx="150" cy="150" r="66"/><circle class="shade" cx="150" cy="150" r="66"/><circle class="rim" cx="150" cy="150" r="66" clip-path="url(#cp-completa)"/>
+          <circle class="face" cx="150" cy="150" r="66"/><circle class="dish" cx="150" cy="150" r="66"/><circle class="gloss" cx="150" cy="150" r="66"/>
+          <g class="edge" clip-path="url(#cp-completa)"><circle class="hi" cx="150" cy="150" r="66"/><circle class="lo" cx="150" cy="150" r="66"/></g>
+          <g class="inset" clip-path="url(#cp-completa)"><circle class="lipsh" cx="150" cy="150" r="66"/><circle class="in1" cx="150" cy="150" r="66"/><circle class="in2" cx="150" cy="150" r="66"/><circle class="in3" cx="150" cy="150" r="66"/></g>
           <text class="emo big" x="150" y="138">🍽️</text>
           <text class="nm" x="150" y="164">Completa</text>
           <g class="pill"><rect x="137" y="171" width="26" height="17" rx="8.5"/><text x="150" y="183.5">1</text></g>

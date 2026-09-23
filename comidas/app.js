@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '45';
+const APP_VERSION = '46';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -309,6 +309,19 @@ function tap(part) {
   toast(`${noun} ${whole ? 'sumada' : 'sumado'} a ${where}`.replace(' a el ', ' al '), undo);
 }
 
+// a haptic tick: Android has vibrate(); iOS Safari (18+) has no API, but toggling a native
+// <input switch> through its label plays the system tick, so a hidden one does the job
+const haptic = (() => {
+  if (navigator.vibrate) return () => navigator.vibrate(12);
+  const label = document.createElement('label');
+  label.setAttribute('aria-hidden', 'true');
+  label.style.cssText = 'position:fixed;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;left:-9px;top:0';
+  const sw = document.createElement('input');
+  sw.type = 'checkbox'; sw.setAttribute('switch', ''); sw.tabIndex = -1;
+  label.append(sw); document.body.append(label);
+  return () => label.click();
+})();
+
 // the dial's parts are SVG groups: press feedback by hand, keyboard like a button
 for (const key of $('pad').querySelectorAll('.key')) {
   const press = (on) => key.classList.toggle('pressed', on);
@@ -320,7 +333,7 @@ for (const key of $('pad').querySelectorAll('.key')) {
     // show the new state in the same frame as the tap; logging, toast and redraws follow right after
     key.classList.toggle('on');
     key.classList.remove('pressed');
-    key.querySelector('.face').animate([{ opacity: 0.7 }, { opacity: 1 }], { duration: 220, easing: 'ease-out' });
+    haptic();
     requestAnimationFrame(() => setTimeout(() => tap(key.dataset.part), 0));
   });
   key.addEventListener('keydown', (ev) => {
