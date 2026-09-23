@@ -227,17 +227,20 @@ $('dayToday').onclick = () => useDay(isoDate(new Date()));
 
 // ---------- keypad ----------
 
-function occasion(fecha, momento) {
-  return state.entries.find((e) => e.fecha === fecha && e.momento === momento);
+// The entry the keypad acts on for a day and meal. A whole free meal is its own entry,
+// separate from the one holding the ⅓ parts, so the two always add up.
+function occasion(fecha, momento, completa = false) {
+  return state.entries.find((e) => e.fecha === fecha && e.momento === momento && !!e.completa === completa);
 }
 
 function renderPad() {
   if ($('dayList')) renderToday();
   const occ = occasion(currentDate(), currentMeal());
+  const whole = occasion(currentDate(), currentMeal(), true);
   for (const key of $('pad').querySelectorAll('.key')) {
     const part = key.dataset.part;
     let badge = key.querySelector('.done');
-    const on = !!(occ && (part === 'completa' ? occ.completa : occ.partes[part]));
+    const on = part === 'completa' ? !!whole : !!(occ && occ.partes[part]);
     if (on && !badge) {
       badge = document.createElement('span');
       badge.className = 'done';
@@ -258,11 +261,10 @@ function snapshot() {
 function tap(part) {
   const fecha = currentDate();
   const momento = currentMeal();
+  const whole = part === 'completa';
   const noun = { comida: 'Comida fuera del plan', alcohol: 'Alcohol', postre: 'Dulce', completa: 'Comida libre completa' }[part];
-  const has = (e) => (part === 'completa' ? !!e.completa : !!e.partes[part]);
-  const set = (e, v) => { if (part === 'completa') e.completa = v; else e.partes[part] = v; };
   const where = `${withArticle(momento)} ${dayLabel(fecha)}`;
-  const occ = occasion(fecha, momento);
+  const occ = occasion(fecha, momento, whole);
   const before = snapshot();
   const undo = () => {
     state.entries = JSON.parse(before);
@@ -270,40 +272,38 @@ function tap(part) {
     render();
     toast('Deshecho');
   };
-  // keys toggle: tapping a part that's already in this meal takes it out
-  if (occ && has(occ)) {
-    set(occ, false);
-    const empty = !thirdsOf(occ);
+  // keys toggle: tapping what's already in this meal takes it out
+  if (occ && (whole || occ.partes[part])) {
+    if (!whole) occ.partes[part] = false;
+    const empty = whole || !thirdsOf(occ);
     if (empty) state.entries = state.entries.filter((e) => e !== occ);
     persist();
     render();
-    toast(empty ? `Registro de ${where} borrado` : `${noun} ${part === 'completa' ? 'sacada' : 'sacado'} de ${where}`, undo);
+    toast(whole ? `${noun} sacada de ${where}` : empty ? `Registro de ${where} borrado` : `${noun} sacado de ${where}`, undo);
     return;
   }
-  const gained = occ ? thirdsOf(occ) : 0;
   if (occ) {
-    set(occ, true);
+    occ.partes[part] = true;
   } else {
     state.entries.push({
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       fecha,
       hora: currentTime(momento),
       momento,
-      partes: { comida: false, alcohol: false, postre: false },
-      completa: false,
+      partes: { comida: false, alcohol: false, postre: false, ...(whole ? {} : { [part]: true }) },
+      completa: whole,
       descripcion: '',
       lugar: '',
       disfrute: 0,
       notas: '',
     });
-    set(state.entries[state.entries.length - 1], true);
   }
   persist();
-  const added = thirdsOf(occ || state.entries[state.entries.length - 1]) - gained;
+  const added = whole ? 3 : 1;
   freshWedges = added;
-  hurt(added, document.querySelector(`.key[data-part="${part}"]`), part === 'completa');
+  hurt(added, document.querySelector(`.key[data-part="${part}"]`), whole);
   if (weekOffsetOf(fecha) !== weekOffset) goWeek(weekOffsetOf(fecha)); else render();
-  toast(`${noun} ${part === 'completa' ? 'sumada' : 'sumado'} a ${where}`.replace(' a el ', ' al '), undo);
+  toast(`${noun} ${whole ? 'sumada' : 'sumado'} a ${where}`.replace(' a el ', ' al '), undo);
 }
 
 for (const key of $('pad').querySelectorAll('.key')) {
@@ -1331,20 +1331,29 @@ $('fileInput').onchange = async (ev) => {
 // Red vignette + a short shake + a floating "−⅓ 💔" from the key. A whole free meal hits harder.
 function hurt(thirds, from, heavy = thirds >= 3) {
   if (!thirds) return;
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Web Animations restart reliably on every tap (class toggling doesn't on iOS Safari)
   const fx = $('hurt');
-  fx.classList.remove('hit', 'big');
-  void fx.offsetWidth; // restart the animation
-  fx.classList.add('hit');
-  if (heavy) fx.classList.add('big');
-  const main = document.querySelector('main');
-  main.classList.remove('shake', 'shake-big');
-  void main.offsetWidth;
-  main.classList.add(heavy ? 'shake-big' : 'shake');
-  if (from) {
+  fx.classList.toggle('big', heavy);
+  fx.getAnimations().forEach((a) => a.cancel());
+  fx.animate(heavy
+    ? [{ opacity: 0 }, { opacity: 1, offset: 0.08 }, { opacity: 0.5, offset: 0.3 }, { opacity: 1, offset: 0.42 }, { opacity: 0 }]
+    : [{ opacity: 0 }, { opacity: 1, offset: 0.12 }, { opacity: 0 }],
+  { duration: still ? 400 : heavy ? 1100 : 700, easing: 'ease-out' });
+  if (!still) {
+    const main = document.querySelector('main');
+    main.getAnimations().forEach((a) => a.cancel());
+    const d = heavy ? 9 : 5;
+    main.animate([
+      { transform: 'none' }, { transform: `translateX(${-d}px)` }, { transform: `translateX(${d}px)` },
+      { transform: `translateX(${-d}px)` }, { transform: `translateX(${d / 2}px)` }, { transform: 'none' },
+    ], { duration: heavy ? 550 : 320, easing: 'cubic-bezier(.36,.07,.19,.97)' });
+  }
+  if (from && !still) {
     const r = from.getBoundingClientRect();
     const f = Object.assign(document.createElement('div'), { className: 'dmg' + (heavy ? ' big' : ''), textContent: `−${fmtThirds(thirds)} 💔` });
     f.style.left = `${r.left + r.width / 2}px`;
-    f.style.top = `${r.top + r.height * 0.3}px`;
+    f.style.top = `${r.top + r.height * 0.4}px`;
     document.body.appendChild(f);
     setTimeout(() => f.remove(), 1100);
   }
