@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '48';
+const APP_VERSION = '49';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -335,6 +335,20 @@ for (const key of $('pad').querySelectorAll('.key')) {
       group.append(layer);
     }
   };
+  // the side wall: one copy per pixel of depth, darkening downwards, so it reads as a single solid
+  // extruded body instead of a second slab behind the cap
+  const side = key.querySelector('.side');
+  const deep = `var(--${key.dataset.part}-deep)`;
+  for (let y = 9; y >= 1; y--) {
+    const layer = shape.cloneNode();
+    layer.removeAttribute('class');
+    layer.setAttribute('transform', `translate(0 ${y})`);
+    layer.style.fill = `color-mix(in srgb, ${deep}, #000 ${Math.round(y * 2.5)}%)`;
+    side.append(layer);
+  }
+  // a pillowed rim: the light rolls over the top edge and the bottom edge turns into the wall
+  stack(key.querySelector('.edge .hi'), 14, 0.14);
+  stack(key.querySelector('.edge .lo'), 14, 0.12);
   stack(key.querySelector('.soft'), 24, 0.022);        // contact shadow under the resting cap
   stack(key.querySelector('.hole .blur'), 10, 0.07);   // the hole's inner walls
   stack(key.querySelector('.inset .blur'), 12, 0.05);  // inner shadow on a latched cap
