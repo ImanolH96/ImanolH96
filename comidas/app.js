@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '34';
+const APP_VERSION = '35';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -1938,7 +1938,20 @@ document.addEventListener('visibilitychange', () => {
 setInterval(render, 60 * 1000);
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
+  // when a new version takes over, reload once so it shows right away
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloaded) return;
+    reloaded = true;
+    location.reload();
+  });
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+    .then((reg) => {
+      reg.update();
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update(); });
+    })
+    .catch(() => {});
 }
 
 render();

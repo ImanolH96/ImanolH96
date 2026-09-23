@@ -75,5 +75,5 @@ Hace falta servirla por HTTPS **una sola vez** para instalarla; después queda c
 - `app.js` – lógica, almacenamiento, exportar/importar Excel
 - `vendor/xlsx.mini.min.js` – SheetJS 0.18.5 (incluida localmente para funcionar offline)
 - `fonts/bricolage.woff2` – tipografía Bricolage Grotesque (OFL), local para funcionar offline
-- `sw.js` – service worker (cache offline). Si cambiás archivos, subí la versión de `CACHE` para que el iPhone baje la nueva.
+- `sw.js` – service worker: con conexión siempre carga lo último de la red y guarda copia; sin conexión usa la copia. Al publicar, subí `CACHE` y `APP_VERSION` (app.js); la app se recarga sola al detectar la versión nueva.
 - `manifest.webmanifest`, `icon-*.png` – instalación en pantalla de inicio
