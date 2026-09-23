@@ -63,8 +63,27 @@
   .today-sum .head small { color: var(--muted); font-size: 13px; }
   .today-sum .head .status { font-size: 13px; padding-block: 3px; }
   .today-sum .head .status i { width: 20px; height: 20px; }
-  .today-sum b { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
-  .today-sum .note { align-self: flex-end; margin-top: -2px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  /* the headline is what's left; the plates show it in the dial's own units (1 plate = 1 free meal, cut in thirds) */
+  .today-sum .hero { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .today-sum .hero-text { display: flex; flex-direction: column; min-width: 0; }
+  .today-sum .cap { font-size: 14px; font-weight: 600; color: var(--paper); }
+  .today-sum .num { font-size: 40px; line-height: 1; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin: 1px 0 3px; }
+  .today-sum.s-over .num { color: var(--over); }
+  .today-sum .sub { font-size: 13px; color: var(--muted); }
+  .today-sum .plates { flex: none; height: 46px; width: auto; max-width: 62%; overflow: visible; }
+  .plates .w { stroke: var(--panel); stroke-width: 2.5; stroke-linejoin: round; }
+  .plates .w-empty { fill: var(--ink); }
+  .plates .w-comida { fill: var(--comida); }
+  .plates .w-alcohol { fill: var(--alcohol); }
+  .plates .w-postre { fill: var(--postre); }
+  .plates .w-completa { fill: var(--completa); }
+  .plates .w-reserved { fill: url(#hatch); }
+  .plates .h-bg { fill: var(--ink); } .plates .h-ln { fill: var(--completa); }
+  .plates .extra .w-empty { fill: transparent; }
+  .plates .ring { fill: none; stroke: var(--over); stroke-width: 2.5; stroke-dasharray: 4 3; }
+  .today-sum .note { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .key-hatch { width: 14px; height: 14px; border-radius: 4px; flex: none;
+    background: repeating-linear-gradient(45deg, var(--completa) 0 2px, var(--ink) 2px 5px); }
   .pbar { position: relative; display: block; height: 10px; border-radius: 5px; background: var(--ink); overflow: hidden; }
   .pbar .fill { position: absolute; top: 0; bottom: 0; left: 0; background: var(--st, var(--good)); }
   .pbar .fill.extra { background: var(--over); }

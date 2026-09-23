@@ -5,7 +5,7 @@ Todo corre en el dispositivo: sin servidor, sin cuentas, sin backend. Funciona o
 
 ## Qué hace
 
-En Registrar, una tarjeta con barra de progreso de la semana ("Usaste ⅔ de 2 comidas libres", marcas en cada comida libre y lo que excede el cupo en rojo). Al pasar el cupo semanal se muestra cupo + extra, ej. "2+⅔".
+En Registrar, la tarjeta "Esta semana" dice en grande cuánto te queda ("Te quedan 1⅔ de 2 comidas libres · quedan 5 días") y lo muestra con un plato por comida libre, partido en tercios como la botonera: cada porción usada lleva el color de lo que fue (comida, alcohol, dulce o completa), lo reservado para eventos va rayado y lo que pasa del cupo cae en platos extra con borde rojo ("Te pasaste +⅓").
 
 Cuatro pestañas abajo: **Registrar** (abre siempre en el día de hoy; se puede cambiar a ayer u otro día), **Semana**, **Mes** y **Planificar**. Exportar/importar Excel está en ⚙️ Ajustes.
 

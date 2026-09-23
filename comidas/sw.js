@@ -1,5 +1,5 @@
 // Network-first service worker: online you always get the latest version; offline, the cached copy.
-const CACHE = 'comidas-libres-v50';
+const CACHE = 'comidas-libres-v51';
 const ASSETS = ['./', 'index.html', 'app.js', 'vendor/xlsx.mini.min.js', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png', 'fonts/bricolage.woff2'];
 
 self.addEventListener('install', (e) => {

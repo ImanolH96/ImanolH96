@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '50';
+const APP_VERSION = '51';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -654,27 +654,99 @@ function entryRow(e, title) {
 
 // ---------- Hoy tab: this week at a glance + the selected day's entries ----------
 
+// Week-at-a-glance plates: one plate per free meal of the quota, each cut in three like the dial.
+// Used thirds are painted in the part's color (in the order they were logged), events already
+// reserved are hatched, and anything above the quota spills onto extra plates ringed in red.
+const SVGNS = 'http://www.w3.org/2000/svg';
+function wedgePath(cx, cy, r, i) {
+  const a0 = (-90 + i * 120) * Math.PI / 180, a1 = (-90 + (i + 1) * 120) * Math.PI / 180;
+  const p = (a) => `${(cx + r * Math.cos(a)).toFixed(2)} ${(cy + r * Math.sin(a)).toFixed(2)}`;
+  return `M${cx} ${cy} L${p(a0)} A${r} ${r} 0 0 1 ${p(a1)} Z`;
+}
+function weekPlates(slices, quota) {
+  const plates = Math.max(quota / 3, Math.ceil(slices.length / 3));
+  const size = 44, gap = 10, pad = 3;
+  const svg = document.createElementNS(SVGNS, 'svg');
+  svg.setAttribute('class', 'plates');
+  svg.setAttribute('viewBox', `0 0 ${plates * size + (plates - 1) * gap + pad * 2} ${size + pad * 2}`);
+  svg.setAttribute('aria-hidden', 'true');
+  svg.innerHTML = '<defs><pattern id="hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
+    + '<rect width="5" height="5" class="h-bg"/><rect width="2" height="5" class="h-ln"/></pattern></defs>';
+  for (let k = 0; k < plates; k++) {
+    const cx = pad + k * (size + gap) + size / 2, cy = pad + size / 2;
+    const extra = k * 3 >= quota;
+    const g = document.createElementNS(SVGNS, 'g');
+    g.setAttribute('class', extra ? 'plate extra' : 'plate');
+    for (let i = 0; i < 3; i++) {
+      const kind = slices[k * 3 + i] || 'empty';
+      const w = document.createElementNS(SVGNS, 'path');
+      w.setAttribute('d', wedgePath(cx, cy, size / 2, i));
+      w.setAttribute('class', `w w-${kind}`);
+      g.append(w);
+    }
+    if (extra) {
+      const ring = document.createElementNS(SVGNS, 'circle');
+      Object.entries({ cx, cy, r: size / 2 + 1.5, class: 'ring' }).forEach(([n, v]) => ring.setAttribute(n, v));
+      g.append(ring);
+    }
+    svg.append(g);
+  }
+  return svg;
+}
+
 function renderToday() {
   const [from, to] = weekBounds();
-  const used = thirdsBetween(from, to);
+  const todayIso = isoDate(new Date());
+  const week = state.entries.filter((e) => e.fecha >= from && e.fecha <= to)
+    .sort((x, y) => (x.fecha + x.hora).localeCompare(y.fecha + y.hora));
+  const slices = [];
+  for (const e of week) {
+    if (e.completa) slices.push('completa', 'completa', 'completa');
+    else for (const [k] of PARTS) if (e.partes[k]) slices.push(k);
+  }
+  const used = slices.length;
   const quota = (Number(state.settings.quota) || 0) * 3;
   const left = quota - used;
+  const reserved = Math.min(plannedBetween(todayIso, to), Math.max(left, 0));
+  for (let i = 0; i < reserved; i++) slices.push('reserved');
   const st = weekStatus(used, quota, false);
+  const daysLeft = Math.round((parseDate(to) - parseDate(todayIso)) / 864e5) + 1;
+
   const box = $('todaySummary');
   box.innerHTML = '';
   box.className = `today-sum s-${st.key}`;
   const head = document.createElement('span');
   head.className = 'head';
   head.append(Object.assign(document.createElement('small'), { textContent: 'Esta semana' }), statusPill(st));
-  const text = left < 0 ? `Usaste ${fmtThirds(quota)} + ${fmtThirds(-left)} extra` : `Usaste ${fmtThirds(used)} de ${mealsWord(quota / 3)}`;
-  const reserved = plannedBetween(isoDate(new Date()), to);
-  let note = left > 0 ? `Te quedan ${fmtThirds(left)}` : left === 0 ? 'Cupo completo' : `Cupo semanal: ${quota / 3}`;
-  if (reserved) note += `, ${fmtThirds(reserved)} reservado para eventos`;
+
+  // the headline is what you can still use; over the quota, how far above it you are
+  const num = left < 0 ? `+${fmtThirds(-left)}` : fmtThirds(left);
+  const one = left === 1 || left === 3;
+  const cap = left < 0 ? 'Te pasaste' : one ? 'Te queda' : 'Te quedan';
+  const days = daysLeft === 1 ? 'último día' : `quedan ${daysLeft} días`;
+  const sub = left < 0 ? `sobre tu cupo de ${quota / 3}` : left === 0 ? `Cupo completo · ${days}` : `de ${mealsWord(quota / 3)} · ${days}`;
+  const hero = document.createElement('span');
+  hero.className = 'hero';
+  const text = document.createElement('span');
+  text.className = 'hero-text';
+  text.append(Object.assign(document.createElement('span'), { className: 'cap', textContent: cap }),
+    Object.assign(document.createElement('b'), { className: 'num', textContent: num }),
+    Object.assign(document.createElement('small'), { className: 'sub', textContent: sub }));
+  hero.append(text, weekPlates(slices, quota));
+
+  const notes = [];
+  if (reserved) notes.push(`${fmtThirds(reserved)} reservado para eventos`);
   const planned = state.alloc[from];
-  if (planned) note += `. Tu plan: ${fmtThirds(planned)} más`;
-  box.append(head, Object.assign(document.createElement('b'), { textContent: text }), progressBar(used, quota, reserved),
-    Object.assign(document.createElement('small'), { className: 'note', textContent: note }));
-  box.setAttribute('aria-label', `Esta semana: ${text}. ${note}. ${st.label}. Ver semana`);
+  if (planned) notes.push(`tu plan: ${fmtThirds(planned)} más`);
+  box.append(head, hero);
+  if (notes.length) {
+    const note = Object.assign(document.createElement('small'), { className: 'note' });
+    if (reserved) note.append(Object.assign(document.createElement('i'), { className: 'key-hatch', ariaHidden: 'true' }));
+    note.append(notes.join(' · ').replace(/^./, (c) => c.toUpperCase()));
+    box.append(note);
+  }
+  const said = left < 0 ? `te pasaste ${fmtThirds(-left)} del cupo de ${mealsWord(quota / 3)}` : `${cap.toLowerCase()} ${fmtThirds(left)} de ${mealsWord(quota / 3)}, ${days}`;
+  box.setAttribute('aria-label', `Esta semana: ${said}, usaste ${fmtThirds(used)}. ${notes.join('. ')} ${st.label}. Ver semana`);
 
   renderTodayPlans();
   const fecha = currentDate();
