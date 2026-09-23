@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '36';
+const APP_VERSION = '37';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -1729,8 +1729,10 @@ $('icsSave').onclick = () => {
 const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
 const GCAL_TOKEN_KEY = 'comidas-libres:gcal-token';
 
+// Always the same address (…/comidas/), however the app was opened (…/index.html, query, etc.):
+// it has to match the "Authorized redirect URI" in Google Cloud exactly.
 function gcalRedirectUri() {
-  return location.origin + location.pathname;
+  return location.origin + location.pathname.replace(/index\.html$/, '');
 }
 
 function gcalToken() {
