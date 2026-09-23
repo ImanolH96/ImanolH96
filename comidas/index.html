@@ -165,15 +165,19 @@
   .pad { display: flex; justify-content: center; }
   .dial { width: min(100%, 290px); height: auto; display: block; overflow: visible; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
   .key { cursor: pointer; outline: none; -webkit-tap-highlight-color: transparent; }
-  .key .top { transition: transform .07s ease-out; }
-  .key.pressed .top { transform: translateY(5px); }
+  .key .top { transition: transform .12s cubic-bezier(.3, 1.4, .5, 1); }
+  .key.pressed .top { transform: translateY(5px); transition-duration: .05s; }
+  /* latched (already added): sunk to the base, darker, inner shadow — like a pressed-in button */
+  .key.on .top { transform: translateY(5px); }
+  .key.on.pressed .top { transform: translateY(7px); }
+  .key.on .face { filter: url(#pressedIn); }
+  .key.on .emo { opacity: .85; }
   .key .face { transition: filter .15s; }
   .key.pressed .face { filter: brightness(1.25) saturate(1.1); }
   .key[data-part="comida"] .face { fill: var(--comida); } .key[data-part="comida"] .base { fill: var(--comida-deep); }
   .key[data-part="alcohol"] .face { fill: var(--alcohol); } .key[data-part="alcohol"] .base { fill: var(--alcohol-deep); }
   .key[data-part="postre"] .face { fill: var(--postre); } .key[data-part="postre"] .base { fill: var(--postre-deep); }
   .key.hub .face { fill: var(--completa); } .key.hub .base { fill: var(--completa-deep); }
-  .key.on .face { stroke: var(--paper); stroke-width: 4; }
   .key:focus-visible .face { stroke: var(--paper); stroke-width: 4; stroke-dasharray: 6 4; }
   .key text { text-anchor: middle; font-family: var(--font); pointer-events: none; }
   .key .emo { font-size: 30px; }
@@ -497,6 +501,20 @@
 
   <section class="pad" id="pad" aria-label="Registrar">
     <svg class="dial" viewBox="0 -4 300 314" role="group" aria-label="Sumar comida libre">
+      <defs>
+        <!-- latched state: the part sinks, darkens and gets an inner shadow along its top edge -->
+        <filter id="pressedIn" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+          <feComponentTransfer in="SourceGraphic" result="dark">
+            <feFuncR type="linear" slope="0.74"/><feFuncG type="linear" slope="0.74"/><feFuncB type="linear" slope="0.74"/>
+          </feComponentTransfer>
+          <feFlood flood-color="#000" flood-opacity="0.6"/>
+          <feComposite in2="SourceAlpha" operator="out"/>
+          <feOffset dy="5"/>
+          <feGaussianBlur stdDeviation="3.5" result="shadow"/>
+          <feComposite in="shadow" in2="SourceAlpha" operator="in" result="inner"/>
+          <feMerge><feMergeNode in="dark"/><feMergeNode in="inner"/></feMerge>
+        </filter>
+      </defs>
       <g class="key seg" data-part="comida" role="button" tabindex="0" aria-label="Sumar comida">
         <path class="base" d="M29.68 67.30 A146 146 0 0 1 270.32 67.30 L215.93 104.69 A80 80 0 0 0 84.07 104.69 Z" transform="translate(0 6)"/>
         <g class="top">
