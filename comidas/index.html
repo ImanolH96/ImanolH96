@@ -369,7 +369,21 @@
   .plan-legend .lg-used { background: var(--st); }
   .plan-legend .lg-res { background: repeating-linear-gradient(135deg, var(--completa) 0 3px, color-mix(in srgb, var(--completa) 35%, transparent) 3px 6px); }
   .plan-legend .lg-free { background: var(--ink); box-shadow: inset 0 0 0 1.5px var(--line); }
+  .plan-actions { display: flex; flex-direction: column; gap: 8px; }
   .plan-add { width: 100%; }
+  .plan-ics { width: 100%; }
+  .ics-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 52vh; overflow-y: auto; }
+  .ics { display: flex; align-items: center; gap: 8px; background: var(--ink); border-radius: 12px; padding: 4px 6px 4px 4px; }
+  .ics-pick { flex: 1; min-width: 0; display: grid; grid-template-columns: 26px 5.6em 1fr; align-items: center; gap: 8px;
+    border: 0; background: none; text-align: left; padding: 6px 4px; }
+  .ics-check { width: 24px; height: 24px; border-radius: 7px; border: 2px solid var(--line); display: grid; place-items: center; font-size: 13px; font-weight: 800; }
+  .ics.on .ics-check { background: var(--completa); border-color: var(--completa); color: var(--ink-deep); }
+  .ics-date { font-size: 13px; color: var(--muted); }
+  .ics-pick b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ics:not(.on) .ics-pick b { color: var(--muted); font-weight: 500; }
+  .ics-val { flex: none; min-width: 40px; border: 1.5px solid var(--line); background: none; border-radius: 999px; padding: 4px 10px; font-weight: 800; }
+  .ics.on .ics-val { border-color: var(--completa); }
+  .solid:disabled { opacity: .5; }
   .plan-block h3 { margin: 0 0 8px; font-size: 17px; font-weight: 700; }
   .plan-list, .plan-weeks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
   .prow { display: flex; align-items: center; gap: 12px; background: var(--panel); border-radius: 14px; padding: 8px 10px; }
@@ -515,7 +529,11 @@
         <button class="nav" id="planNext" type="button" aria-label="Mes siguiente"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
       </div>
       <div class="plan-budget" id="planBudget"></div>
-      <button class="solid plan-add" id="planAdd" type="button">+ Agregar evento</button>
+      <div class="plan-actions">
+        <button class="solid plan-add" id="planAdd" type="button">+ Agregar evento</button>
+        <button class="ghost plan-ics" id="icsBtn" type="button">Importar de Google Calendar</button>
+        <input type="file" id="icsInput" accept=".ics,text/calendar" class="hidden">
+      </div>
       <div class="plan-block">
         <h3>Eventos</h3>
         <ul class="plan-list" id="planList"></ul>
@@ -578,6 +596,19 @@
       <button class="link" type="button" data-close>Cerrar</button>
     </div>
   </form>
+</div>
+
+<!-- choose calendar events to reserve -->
+<div class="scrim" id="icsSheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="icsTitle">
+    <h3 id="icsTitle">¿Cuáles son comidas libres?</h3>
+    <p>Marcá los eventos que vas a reservar. Tocá el número para cambiar cuánto vale (⅓, ⅔ o 1).</p>
+    <ul class="ics-list" id="icsList"></ul>
+    <div class="actions">
+      <button class="solid" type="button" id="icsSave">Reservar</button>
+      <button class="link" type="button" data-close>Cancelar</button>
+    </div>
+  </div>
 </div>
 
 <!-- settings -->

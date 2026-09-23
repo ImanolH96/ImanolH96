@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '32';
+const APP_VERSION = '33';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -1592,6 +1592,119 @@ $('pDelete').onclick = () => {
 };
 $('planPrev').onclick = () => { planMonth = new Date(planMonth.getFullYear(), planMonth.getMonth() - 1, 1); renderPlan(); };
 $('planNext').onclick = () => { planMonth = new Date(planMonth.getFullYear(), planMonth.getMonth() + 1, 1); renderPlan(); };
+
+
+// ---- import events from Google Calendar (.ics export) ----
+
+// Words that usually mean a free meal; those events come pre-selected.
+const FOOD_WORDS = /cumple|birthday|asado|cena|almuerzo|brunch|casamiento|boda|fiesta|after|brindis|aniversario|despedida|salida|restaurante|parrilla|pizza|sushi|evento/i;
+let icsCandidates = [];
+
+// Minimal iCalendar parser: SUMMARY + DTSTART of each VEVENT, yearly recurrences expanded.
+function parseICS(text, from, to) {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\n[ \t]/g, '').split('\n'); // unfold
+  const out = [];
+  let ev = null;
+  for (const line of lines) {
+    if (line === 'BEGIN:VEVENT') { ev = {}; continue; }
+    if (line === 'END:VEVENT') { if (ev && ev.start) out.push(...expandEvent(ev, from, to)); ev = null; continue; }
+    if (!ev) continue;
+    const i = line.indexOf(':');
+    if (i < 0) continue;
+    const key = line.slice(0, i).toUpperCase(), val = line.slice(i + 1);
+    const name = key.split(';')[0];
+    if (name === 'SUMMARY') ev.summary = val.replace(/\\([,;\\])/g, '$1').replace(/\\n/gi, ' ').trim();
+    else if (name === 'DTSTART') ev.start = parseICSDate(val, key);
+    else if (name === 'RRULE') ev.rrule = val;
+    else if (name === 'STATUS') ev.status = val;
+  }
+  return out;
+}
+
+function parseICSDate(val, key) {
+  const m = val.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z)?)?/);
+  if (!m) return null;
+  const [, y, mo, d, hh, mm, , z] = m;
+  if (!hh || /VALUE=DATE(?!-)/.test(key)) return { date: `${y}-${mo}-${d}`, time: null };
+  const dt = z ? new Date(Date.UTC(+y, +mo - 1, +d, +hh, +mm)) : new Date(+y, +mo - 1, +d, +hh, +mm);
+  return { date: isoDate(dt), time: isoTime(dt) };
+}
+
+function expandEvent(ev, from, to) {
+  if (ev.status === 'CANCELLED' || !ev.summary) return [];
+  const one = (date) => ({ fecha: date, time: ev.start.time, nombre: ev.summary });
+  if (!ev.rrule) return ev.start.date >= from && ev.start.date <= to ? [one(ev.start.date)] : [];
+  if (!/FREQ=YEARLY/.test(ev.rrule)) return []; // weekly/daily repeats (meetings, gym…) aren't events to plan
+  const res = [];
+  const md = ev.start.date.slice(5);
+  for (let y = +from.slice(0, 4); y <= +to.slice(0, 4); y++) {
+    const date = `${y}-${md}`;
+    if (date >= ev.start.date && date >= from && date <= to) res.push(one(date));
+  }
+  return res;
+}
+
+async function importICS(file) {
+  const text = await file.text();
+  const now = new Date();
+  const from = isoDate(now);
+  const end = new Date(now.getFullYear(), now.getMonth() + 7, 0);
+  const found = parseICS(text, from, isoDate(end))
+    .filter((c) => !state.plans.some((p) => p.fecha === c.fecha && p.nombre === c.nombre))
+    .sort((a, b) => a.fecha.localeCompare(b.fecha));
+  if (!found.length) { toast('No encontré eventos nuevos en los próximos 6 meses'); return; }
+  icsCandidates = found.map((c) => ({
+    ...c,
+    on: FOOD_WORDS.test(c.nombre),
+    momento: c.time ? guessMeal(c.time) : 'Cena',
+    valor: /after|brindis/i.test(c.nombre) ? 1 : 3,
+  }));
+  renderICS();
+  openSheet('icsSheet');
+}
+
+function renderICS() {
+  const list = $('icsList');
+  list.innerHTML = '';
+  icsCandidates.forEach((c, i) => {
+    const li = document.createElement('li');
+    li.className = 'ics' + (c.on ? ' on' : '');
+    const pick = document.createElement('button');
+    pick.type = 'button';
+    pick.className = 'ics-pick';
+    pick.setAttribute('aria-pressed', String(c.on));
+    const d = parseDate(c.fecha);
+    pick.append(Object.assign(document.createElement('span'), { className: 'ics-check', textContent: c.on ? '✓' : '' }),
+      Object.assign(document.createElement('span'), { className: 'ics-date', textContent: d.toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/^\w/, (x) => x.toUpperCase()) }),
+      Object.assign(document.createElement('b'), { textContent: c.nombre }));
+    pick.onclick = () => { c.on = !c.on; renderICS(); };
+    const val = Object.assign(document.createElement('button'), { type: 'button', className: 'ics-val', textContent: c.valor === 3 ? '1' : fmtThirds(c.valor) });
+    val.setAttribute('aria-label', `Valor ${val.textContent}. Cambiar`);
+    val.onclick = () => { c.valor = c.valor === 3 ? 1 : c.valor + 1; c.on = true; renderICS(); };
+    li.append(pick, val);
+    list.appendChild(li);
+  });
+  const n = icsCandidates.filter((c) => c.on).length;
+  $('icsSave').textContent = n ? `Reservar ${n} ${n === 1 ? 'evento' : 'eventos'}` : 'Elegí al menos uno';
+  $('icsSave').disabled = !n;
+}
+
+$('icsBtn').onclick = () => $('icsInput').click();
+$('icsInput').onchange = (ev) => {
+  const f = ev.target.files[0];
+  ev.target.value = '';
+  if (f) importICS(f).catch(() => toast('No pude leer ese archivo. Tiene que ser un .ics exportado del calendario.'));
+};
+$('icsSave').onclick = () => {
+  const chosen = icsCandidates.filter((c) => c.on);
+  for (const c of chosen) {
+    state.plans.push({ id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), fecha: c.fecha, momento: c.momento, nombre: c.nombre, valor: c.valor });
+  }
+  persist();
+  closeSheet('icsSheet');
+  render();
+  toast(`${chosen.length} ${chosen.length === 1 ? 'evento reservado' : 'eventos reservados'} desde el calendario`);
+};
 
 // ---------- "damage" feedback when a free meal is added ----------
 

@@ -34,7 +34,7 @@ Cuatro pestañas abajo: **Registrar** (abre siempre en el día de hoy; se puede 
 - Semana por semana: si lo reservado entra en el cupo o cuánto se pasaría.
 - El día del evento aparece en Registrar con un botón para registrarlo; los que ya pasaron quedan con "Registrar".
 - Lo reservado también se ve rayado en la barra de la semana y se descuenta en el ajuste del mes. El Excel suma la hoja `Planificados`.
-- Próximo paso: importar eventos de Google Calendar (ver abajo).
+- **Importar de Google Calendar**: exportá tu calendario (calendar.google.com → ⚙️ Configuración → Importar y exportar → Exportar; en el iPhone, abrí el .zip en Archivos y tocá el .ics) y elegilo con "Importar de Google Calendar". La app muestra los eventos de los próximos 6 meses (incluye cumpleaños anuales; ignora repeticiones semanales y cancelados), preselecciona los que parecen de comida y reservás los que marques. Los ya reservados no se duplican.
 
 ## Cómo instalarla en el iPhone
 
