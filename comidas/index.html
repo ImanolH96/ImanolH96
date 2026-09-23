@@ -179,6 +179,10 @@
     border-radius: 999px; padding: 7px 13px; font-size: 15px; line-height: 1.2; font-weight: 500;
   }
   .seg button[aria-pressed="true"] { background: var(--paper); color: var(--ink); border-color: var(--paper); }
+  .seg button.has { border-color: var(--completa); }
+  .seg button .amt { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px; font-size: 12px; font-weight: 800;
+    line-height: 18px; vertical-align: 1px; background: var(--completa); color: var(--ink-deep); font-variant-numeric: tabular-nums; }
+  .seg button[aria-pressed="true"] .amt { background: var(--ink); color: var(--paper); }
 
   /* ---------- the keypad: a Simon-style dial — the three thirds around, the whole meal in the middle ---------- */
   .pad { display: flex; justify-content: center; }

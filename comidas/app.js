@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '55';
+const APP_VERSION = '56';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -131,6 +131,23 @@ function currentMeal() {
   return pickedMeal || guessMeal(isoTime(new Date()));
 }
 
+// thirds logged per meal on a day: { Cena: 2, Almuerzo: 3 }
+function thirdsByMeal(fecha) {
+  const out = {};
+  for (const e of state.entries) if (e.fecha === fecha) out[e.momento] = (out[e.momento] || 0) + thirdsOf(e);
+  return out;
+}
+
+// On opening (and when switching days) land on a meal that already has something logged:
+// the clock's meal if it has entries, otherwise the latest meal logged that day; else the clock decides.
+function landingMeal(fecha) {
+  const guess = guessMeal(isoTime(new Date()));
+  const day = state.entries.filter((e) => e.fecha === fecha);
+  if (!day.length) return undefined;                 // nothing logged: leave the meal as it is
+  if (day.some((e) => e.momento === guess)) return null; // the clock's meal (automatic)
+  return day.reduce((a, b) => (b.hora > a.hora ? b : a)).momento;
+}
+
 // Time stored for a tap: now when logging today, otherwise the start of the meal's range.
 function currentTime(meal) {
   if (dayOffset === 0) return isoTime(new Date());
@@ -156,11 +173,18 @@ function renderWhen() {
 
   const seg = $('segMeal');
   seg.innerHTML = '';
+  const logged = thirdsByMeal(fecha);
   for (const m of MEALS) {
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = m;
     b.setAttribute('aria-pressed', String(m === meal));
+    if (logged[m]) {
+      // meals that already have something logged carry how much, so they're easy to spot
+      b.classList.add('has');
+      b.append(Object.assign(document.createElement('span'), { className: 'amt', textContent: fmtThirds(logged[m]), ariaHidden: 'true' }));
+      b.setAttribute('aria-label', `${m}, ${fmtThirds(logged[m])} registrado`);
+    }
     b.onclick = () => {
       // tapping the auto-detected meal again goes back to automatic
       pickedMeal = m === guessMeal(isoTime(new Date())) ? null : m;
@@ -224,7 +248,9 @@ function useDay(v) {
   if (!v) return;
   const today = isoDate(new Date());
   if (v > today || v < firstOfMonth()) return;
-  if (v === today) { dayOffset = 0; pickedDate = null; pickedMeal = null; } else { dayOffset = null; pickedDate = v; }
+  if (v === today) { dayOffset = 0; pickedDate = null; } else { dayOffset = null; pickedDate = v; }
+  const landing = landingMeal(v);
+  if (landing !== undefined) pickedMeal = landing; else if (v === today) pickedMeal = null;
   stripOffset = weekOffsetOf(v);
   renderWhen();
   renderPad();
@@ -2324,7 +2350,7 @@ $('toastUndo').onclick = () => { const fn = toastUndo; toastUndo = null; if (fn)
 let hiddenAt = 0;
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { hiddenAt = Date.now(); return; }
-  if (hiddenAt && Date.now() - hiddenAt > 30 * 60 * 1000) { dayOffset = 0; pickedDate = null; pickedMeal = null; stripOffset = 0; }
+  if (hiddenAt && Date.now() - hiddenAt > 30 * 60 * 1000) { dayOffset = 0; pickedDate = null; stripOffset = 0; pickedMeal = landingMeal(isoDate(new Date())) || null; }
   render();
 });
 setInterval(render, 60 * 1000);
@@ -2346,5 +2372,6 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     .catch(() => {});
 }
 
+pickedMeal = landingMeal(isoDate(new Date())) || null;
 render();
 gcalHandleRedirect();
