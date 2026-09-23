@@ -10,6 +10,8 @@ En Registrar, una tarjeta con barra de progreso de la semana ("Usaste ⅔ de 2 c
 Tres pestañas abajo: **Registrar** (abre siempre en el día de hoy; se puede cambiar a ayer u otro día), **Semana** y **Mes**. Exportar/importar Excel está en ⚙️ Ajustes.
 
 - **Botonera de un toque**: 🍔 Comida fuera del plan, 🍷 Alcohol y 🍰 Dulce. Cada tecla suma ⅓; las tres juntas son una comida libre.
+- Tecla **🍽️ Comida libre completa**: registra 1 comida libre entera sin marcar alcohol ni dulce (también se puede activar desde el detalle de un registro con "Contar como comida libre completa"). En gráficas aparece en lavanda y el Excel tiene la columna "Completa".
+- Al sumar, efecto de "daño": bordes rojos, sacudida y un "−⅓ 💔" flotando (más fuerte con la comida completa). Se desactiva si el iPhone tiene "Reducir movimiento".
 - Usa la fecha de hoy y detecta el momento por la hora (editable en ⚙️):
   Desayuno 05:00–11:00 · Almuerzo 11:00–15:30 · Merienda 15:30–19:00 · Cena 19:00–05:00.
   Se puede cambiar el momento con los botones, o el día en la tira semanal de arriba (hoy va en mostaza y dice "Hoy"; ‹ › recorren las semanas del mes actual, los días de otros meses y los futuros quedan apagados, y "↺ Hoy" vuelve a hoy).

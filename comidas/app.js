@@ -20,6 +20,7 @@ const COLUMNS = [
   ['comida', 'Comida fuera del plan'],
   ['alcohol', 'Alcohol'],
   ['postre', 'Dulce'],
+  ['completa', 'Completa (1 comida libre)'],
   ['valor', 'Valor (comidas libres)'],
   ['disfrute', 'Disfrute (1-5)'],
   ['notas', 'Notas'],
@@ -59,6 +60,7 @@ let pickedDate = null;    // "YYYY-MM-DD" when dayOffset is null
 let pickedMeal = null;    // null = auto-detect from the clock
 let editingId = null;
 let editParts = {};
+let editCompleta = false;
 let weekOffset = 0;       // 0 = this week, 1 = last week, ...
 let monthRef = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })();
 let freshWedges = 0;      // wedges to animate on next punch render
@@ -84,7 +86,9 @@ function weekBounds(ref = new Date()) {
 
 // ---------- partial counting (in thirds, to avoid float rounding) ----------
 
-const thirdsOf = (e) => PARTS.filter(([k]) => e.partes && e.partes[k]).length;
+// A "completa" entry is a whole free meal on its own (e.g. a big off-plan meal), whatever parts it has.
+const partsOf = (e) => PARTS.filter(([k]) => e.partes && e.partes[k]).length;
+const thirdsOf = (e) => (e.completa ? 3 : partsOf(e));
 
 function fmtThirds(n) {
   const whole = Math.floor(n / 3);
@@ -233,7 +237,7 @@ function renderPad() {
   for (const key of $('pad').querySelectorAll('.key')) {
     const part = key.dataset.part;
     let badge = key.querySelector('.done');
-    const on = !!(occ && occ.partes[part]);
+    const on = !!(occ && (part === 'completa' ? occ.completa : occ.partes[part]));
     if (on && !badge) {
       badge = document.createElement('span');
       badge.className = 'done';
@@ -242,7 +246,7 @@ function renderPad() {
     } else if (!on && badge) {
       badge.remove();
     }
-    const label = PARTS.find(([k]) => k === part)[1];
+    const label = SERIES.find(([k]) => k === part)[1];
     key.setAttribute('aria-label', on ? `${label}: sumado. Tocá para sacarlo` : `Sumar ${label.toLowerCase()}`);
   }
 }
@@ -254,7 +258,9 @@ function snapshot() {
 function tap(part) {
   const fecha = currentDate();
   const momento = currentMeal();
-  const noun = { comida: 'Comida fuera del plan', alcohol: 'Alcohol', postre: 'Dulce' }[part];
+  const noun = { comida: 'Comida fuera del plan', alcohol: 'Alcohol', postre: 'Dulce', completa: 'Comida libre completa' }[part];
+  const has = (e) => (part === 'completa' ? !!e.completa : !!e.partes[part]);
+  const set = (e, v) => { if (part === 'completa') e.completa = v; else e.partes[part] = v; };
   const where = `${withArticle(momento)} ${dayLabel(fecha)}`;
   const occ = occasion(fecha, momento);
   const before = snapshot();
@@ -265,34 +271,39 @@ function tap(part) {
     toast('Deshecho');
   };
   // keys toggle: tapping a part that's already in this meal takes it out
-  if (occ && occ.partes[part]) {
-    occ.partes[part] = false;
+  if (occ && has(occ)) {
+    set(occ, false);
     const empty = !thirdsOf(occ);
     if (empty) state.entries = state.entries.filter((e) => e !== occ);
     persist();
     render();
-    toast(empty ? `Registro de ${where} borrado` : `${noun} sacado de ${where}`, undo);
+    toast(empty ? `Registro de ${where} borrado` : `${noun} ${part === 'completa' ? 'sacada' : 'sacado'} de ${where}`, undo);
     return;
   }
+  const gained = occ ? thirdsOf(occ) : 0;
   if (occ) {
-    occ.partes[part] = true;
+    set(occ, true);
   } else {
     state.entries.push({
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       fecha,
       hora: currentTime(momento),
       momento,
-      partes: { comida: false, alcohol: false, postre: false, [part]: true },
+      partes: { comida: false, alcohol: false, postre: false },
+      completa: false,
       descripcion: '',
       lugar: '',
       disfrute: 0,
       notas: '',
     });
+    set(state.entries[state.entries.length - 1], true);
   }
   persist();
-  freshWedges = 1;
+  const added = thirdsOf(occ || state.entries[state.entries.length - 1]) - gained;
+  freshWedges = added;
+  hurt(added, document.querySelector(`.key[data-part="${part}"]`), part === 'completa');
   if (weekOffsetOf(fecha) !== weekOffset) goWeek(weekOffsetOf(fecha)); else render();
-  toast(`${noun} sumado a ${where}`.replace(' a el ', ' al '), undo);
+  toast(`${noun} ${part === 'completa' ? 'sumada' : 'sumado'} a ${where}`.replace(' a el ', ' al '), undo);
 }
 
 for (const key of $('pad').querySelectorAll('.key')) {
@@ -301,7 +312,9 @@ for (const key of $('pad').querySelectorAll('.key')) {
 
 // ---------- week punch card ----------
 
-const PART_COLOR = { comida: 'var(--comida)', alcohol: 'var(--alcohol)', postre: 'var(--postre)' };
+const PART_COLOR = { comida: 'var(--comida)', alcohol: 'var(--alcohol)', postre: 'var(--postre)', completa: 'var(--completa)' };
+// chart series: the three parts plus the extra thirds a "completa" entry adds
+const SERIES = [...PARTS, ['completa', 'Completa', '🍽️']];
 
 function wedgePath(i) {
   // third i of a circle centred at 24,24 with r=20, starting at 12 o'clock
@@ -386,7 +399,10 @@ function renderWeek() {
     .filter((e) => e.fecha >= from && e.fecha <= to)
     .sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
   const wedges = [];
-  for (const e of week) for (const [k] of PARTS) if (e.partes[k]) wedges.push(k);
+  for (const e of week) {
+    for (const [k] of PARTS) if (e.partes[k]) wedges.push(k);
+    if (e.completa) for (let i = partsOf(e); i < 3; i++) wedges.push('completa');
+  }
   const used = wedges.length;
   const quota = (Number(state.settings.quota) || 0) * 3;
   const left = quota - used;
@@ -486,7 +502,8 @@ function entryRow(e, title) {
   for (const [k] of PARTS) {
     const d = document.createElement('span');
     d.className = 'dot';
-    if (e.partes[k]) { d.style.background = PART_COLOR[k]; d.style.borderColor = PART_COLOR[k]; }
+    const c = e.partes[k] ? PART_COLOR[k] : e.completa ? PART_COLOR.completa : '';
+    if (c) { d.style.background = c; d.style.borderColor = c; }
     dots.appendChild(d);
   }
   const what = document.createElement('span');
@@ -494,7 +511,8 @@ function entryRow(e, title) {
   const t = document.createElement('b');
   t.textContent = title;
   const sub = document.createElement('span');
-  const parts = PARTS.filter(([k]) => e.partes[k]).map(([, l]) => l.toLowerCase()).join(', ');
+  const parts = [e.completa ? 'comida libre completa' : '', ...PARTS.filter(([k]) => e.partes[k]).map(([, l]) => l.toLowerCase())]
+    .filter(Boolean).join(', ');
   sub.textContent = e.descripcion || e.notas || parts.charAt(0).toUpperCase() + parts.slice(1);
   what.append(t, sub);
   const val = document.createElement('span');
@@ -568,7 +586,9 @@ function renderMonth() {
 
   const inMonth = state.entries.filter((e) => e.fecha >= first && e.fecha <= last);
   const total = inMonth.reduce((n, e) => n + thirdsOf(e), 0);
-  const counts = PARTS.map(([k, , icon]) => `${icon} ${inMonth.filter((e) => e.partes[k]).length}`).join('   ');
+  const nCompletas = inMonth.filter((e) => e.completa).length;
+  const counts = PARTS.map(([k, , icon]) => `${icon} ${inMonth.filter((e) => e.partes[k]).length}`).join('   ')
+    + (nCompletas ? `   🍽️ ${nCompletas}` : '');
   $('monthTotal').innerHTML = '';
   const allowed = Math.round(((Number(state.settings.quota) || 0) * new Date(y, m + 1, 0).getDate() / 7) * 3);
   // compare against what the month allows up to today (whole month once it's over)
@@ -815,7 +835,8 @@ function renderLegend(view) {
     lg.appendChild(sp);
     return;
   }
-  for (const [k, label] of PARTS) {
+  const anyCompleta = state.entries.some((e) => e.completa);
+  for (const [k, label] of anyCompleta ? SERIES : PARTS) {
     const it = document.createElement('span');
     it.append(Object.assign(document.createElement('i'), { className: 'sw', style: `background:${PART_COLOR[k]}` }), k === 'comida' ? 'Comida' : label);
     lg.appendChild(it);
@@ -832,14 +853,20 @@ function rightRounded(x, y, w, h, r) {
   return `M${x} ${y} H${x + w - r} Q${x + w} ${y} ${x + w} ${y + r} V${y + h - r} Q${x + w} ${y + h} ${x + w - r} ${y + h} H${x} Z`;
 }
 
+// counts in thirds per series; `completa` holds the thirds a completa entry adds on top of its parts
 const partCounts = (list) => {
-  const c = { comida: 0, alcohol: 0, postre: 0 };
-  for (const e of list) for (const [k] of PARTS) if (e.partes[k]) c[k]++;
+  const c = { comida: 0, alcohol: 0, postre: 0, completa: 0, nCompletas: 0 };
+  for (const e of list) {
+    for (const [k] of PARTS) if (e.partes[k]) c[k]++;
+    if (e.completa) { c.completa += 3 - partsOf(e); c.nCompletas++; }
+  }
   return c;
 };
+const totalOf = (c) => c.comida + c.alcohol + c.postre + c.completa;
 const tipLines = (title, c) => [title,
   ...PARTS.filter(([k]) => c[k]).map(([k, l]) => `${k === 'comida' ? 'Comida' : l}: ${c[k]}`),
-  `Total: ${fmtThirds(c.comida + c.alcohol + c.postre)}`].join('\n');
+  ...(c.nCompletas ? [`Completa: ${c.nCompletas}`] : []),
+  `Total: ${fmtThirds(totalOf(c))}`].join('\n');
 
 function renderWeekly(y, m) {
   const first = isoDate(new Date(y, m, 1));
@@ -855,7 +882,7 @@ function renderWeekly(y, m) {
   }
   const quota = Number(state.settings.quota) || 0;
   const W = 340, H = 210, L = 26, R = 42, T = 44, B = 26;
-  const maxY = Math.max(1, Math.ceil(Math.max(quota, ...weeks.map((w) => (w.c.comida + w.c.alcohol + w.c.postre) / 3))));
+  const maxY = Math.max(1, Math.ceil(Math.max(quota, ...weeks.map((w) => totalOf(w.c) / 3))));
   const yv = (v) => T + (1 - v / maxY) * (H - T - B);
   const svg = $('chart');
   svg.innerHTML = '';
@@ -869,7 +896,7 @@ function renderWeekly(y, m) {
   weeks.forEach((w, i) => {
     const cx = L + band * (i + 0.5);
     let acc = 0;
-    const segs = PARTS.filter(([k]) => w.c[k]);
+    const segs = SERIES.filter(([k]) => w.c[k]);
     const g = el('g', { 'data-tip': tipLines(`Semana del ${weekRangeLabel(w.from, w.to, true)}`, w.c) }, svg);
     segs.forEach(([k], j) => {
       const v = w.c[k] / 3;
@@ -881,7 +908,7 @@ function renderWeekly(y, m) {
       acc += v;
     });
     el('rect', { x: cx - band / 2, y: T, width: band, height: H - T - B, class: 'hit' }, g);
-    const total = w.c.comida + w.c.alcohol + w.c.postre;
+    const total = totalOf(w.c);
     el('text', { x: cx, y: yv(acc) - 6, class: 'endlabel', 'text-anchor': 'middle' }, svg).textContent = fmtUsed(total, quota * 3);
     const st = weekStatus(total, quota * 3, w.to < today);
     const by = yv(acc) - 30;
@@ -894,14 +921,14 @@ function renderWeekly(y, m) {
   el('line', { x1: L, x2: W - R + 6, y1: yv(quota), y2: yv(quota), class: 'pace' }, svg);
   el('text', { x: W - R + 8, y: yv(quota) + 4, class: 'tick' }, svg).textContent = 'cupo';
   tableFrom(['Semana', 'Comida', 'Alcohol', 'Dulce', 'Total'],
-    weeks.map((w) => [weekRangeLabel(w.from, w.to, true), w.c.comida, w.c.alcohol, w.c.postre, fmtThirds(w.c.comida + w.c.alcohol + w.c.postre)]), 'Comidas libres por semana');
+    weeks.map((w) => [weekRangeLabel(w.from, w.to, true), w.c.comida, w.c.alcohol, w.c.postre, fmtThirds(totalOf(w.c))]), 'Comidas libres por semana');
 }
 
 function renderMoments(y, m, inMonth) {
   const rows = MEALS.map((meal) => ({ meal, c: partCounts(inMonth.filter((e) => e.momento === meal)) }));
   const W = 340, rowH = 32, L = 78, R = 36, T = 6;
   const H = T + rows.length * rowH + 4;
-  const max = Math.max(1, ...rows.map((r) => (r.c.comida + r.c.alcohol + r.c.postre) / 3));
+  const max = Math.max(1, ...rows.map((r) => totalOf(r.c) / 3));
   const xv = (v) => L + (v / Math.ceil(max)) * (W - L - R);
   const svg = $('chart');
   svg.innerHTML = '';
@@ -912,7 +939,7 @@ function renderMoments(y, m, inMonth) {
     el('text', { x: L - 10, y: cy + 4, class: 'cat', 'text-anchor': 'end' }, svg).textContent = r.meal;
     const g = el('g', { 'data-tip': tipLines(r.meal, r.c) }, svg);
     let acc = 0;
-    const segs = PARTS.filter(([k]) => r.c[k]);
+    const segs = SERIES.filter(([k]) => r.c[k]);
     segs.forEach(([k], j) => {
       const v = r.c[k] / 3;
       const x0 = xv(acc) + (j ? 2 : 0), w = Math.max(0, xv(acc + v) - xv(acc) - (j ? 2 : 0));
@@ -921,11 +948,11 @@ function renderMoments(y, m, inMonth) {
       acc += v;
     });
     el('rect', { x: 0, y: cy - rowH / 2, width: W, height: rowH, class: 'hit' }, g);
-    const total = r.c.comida + r.c.alcohol + r.c.postre;
+    const total = totalOf(r.c);
     el('text', { x: xv(acc) + 8, y: cy + 4, class: total ? 'endlabel' : 'tick' }, svg).textContent = total ? fmtThirds(total) : '0';
   });
   tableFrom(['Momento', 'Comida', 'Alcohol', 'Dulce', 'Total'],
-    rows.map((r) => [r.meal, r.c.comida, r.c.alcohol, r.c.postre, fmtThirds(r.c.comida + r.c.alcohol + r.c.postre)]), 'Comidas libres por momento del día');
+    rows.map((r) => [r.meal, r.c.comida, r.c.alcohol, r.c.postre, fmtThirds(totalOf(r.c))]), 'Comidas libres por momento del día');
 }
 
 function renderCalendar(y, m, inMonth) {
@@ -952,7 +979,7 @@ function renderCalendar(y, m, inMonth) {
     const iso = isoDate(new Date(y, m, d));
     const list = byDay[iso] || [];
     const c = partCounts(list);
-    const t = c.comida + c.alcohol + c.postre;
+    const t = totalOf(c);
     const i = lead + d - 1;
     const cx = (i % 7) * (cell + gap), cy = top + Math.floor(i / 7) * (cellH + gap);
     const future = iso > today;
@@ -961,7 +988,7 @@ function renderCalendar(y, m, inMonth) {
     el('rect', { x: cx, y: cy, width: cell, height: cellH, rx: 8, class: `heat h${Math.min(3, t)}${future ? ' future' : ''}${iso === today ? ' today' : ''}` }, g);
     el('text', { x: cx + 6, y: cy + 14, class: t >= 2 ? 'daynum dark' : 'daynum' }, g).textContent = d;
     // secondary encoding: one tiny dot per part logged that day
-    PARTS.filter(([k]) => c[k]).forEach(([k], j) => {
+    SERIES.filter(([k]) => c[k]).forEach(([k], j) => {
       el('circle', { cx: cx + cell - 8 - j * 7, cy: cy + cellH - 8, r: 2.5, fill: t >= 2 ? 'var(--ink-deep)' : PART_COLOR[k] }, g);
     });
     if (t) rows.push([d, c.comida, c.alcohol, c.postre, fmtThirds(t)]);
@@ -1048,6 +1075,13 @@ function renderEditParts() {
     b.onclick = () => { editParts[k] = !editParts[k]; renderEditParts(); };
     box.appendChild(b);
   }
+  const full = document.createElement('button');
+  full.type = 'button';
+  full.className = 'wide';
+  full.setAttribute('aria-pressed', String(editCompleta));
+  full.append(Object.assign(document.createElement('span'), { textContent: '🍽️' }), 'Contar como comida libre completa');
+  full.onclick = () => { editCompleta = !editCompleta; renderEditParts(); };
+  box.appendChild(full);
 }
 
 function openEdit(id) {
@@ -1055,6 +1089,7 @@ function openEdit(id) {
   if (!e) return;
   editingId = id;
   editParts = { ...e.partes };
+  editCompleta = !!e.completa;
   $('editTitle').textContent = `${e.momento} ${dayLabel(e.fecha)}`;
   $('eDate').value = e.fecha;
   $('eTime').value = e.hora;
@@ -1067,7 +1102,7 @@ function openEdit(id) {
 
 $('editForm').addEventListener('submit', (ev) => {
   ev.preventDefault();
-  if (!thirdsOf({ partes: editParts })) { toast('Marcá al menos comida, alcohol o dulce'); return; }
+  if (!thirdsOf({ partes: editParts, completa: editCompleta })) { toast('Marcá comida, alcohol, dulce o comida libre completa'); return; }
   const e = state.entries.find((x) => x.id === editingId);
   if (!e) return;
   Object.assign(e, {
@@ -1075,6 +1110,7 @@ $('editForm').addEventListener('submit', (ev) => {
     hora: $('eTime').value,
     momento: $('eMeal').value,
     partes: { ...editParts },
+    completa: editCompleta,
     descripcion: $('eDesc').value.trim(),
     lugar: '',
     notas: $('eNotes').value.trim(),
@@ -1138,10 +1174,11 @@ async function exportXlsx() {
     .map((e) => {
       const flat = { ...e, valor: Math.round((thirdsOf(e) / 3) * 100) / 100 };
       for (const [k] of PARTS) flat[k] = e.partes[k] ? 'Sí' : 'No';
+      flat.completa = e.completa ? 'Sí' : 'No';
       return Object.fromEntries(COLUMNS.map(([k, h]) => [h, flat[k] ?? '']));
     });
   const ws = XLSX.utils.json_to_sheet(rows, { header: COLUMNS.map(([, h]) => h) });
-  ws['!cols'] = [12, 7, 11, 20, 9, 9, 20, 40, 22, 12, 40, 12].map((wch) => ({ wch }));
+  ws['!cols'] = [12, 7, 11, 20, 9, 9, 22, 20, 40, 22, 12, 40, 12].map((wch) => ({ wch }));
 
   // Weekly summary sheet
   const weeks = {};
@@ -1150,6 +1187,7 @@ async function exportXlsx() {
     const w = weeks[from] || (weeks[from] = { thirds: 0, comida: 0, alcohol: 0, postre: 0 });
     w.thirds += thirdsOf(e);
     for (const [k] of PARTS) if (e.partes[k]) w[k]++;
+    if (e.completa) w.completas = (w.completas || 0) + 1;
   }
   const round2 = (x) => Math.round(x * 100) / 100;
   const quota = Number(state.settings.quota);
@@ -1158,12 +1196,13 @@ async function exportXlsx() {
     'Comidas fuera del plan': weeks[w].comida,
     'Alcohol': weeks[w].alcohol,
     'Dulce': weeks[w].postre,
+    'Completas': weeks[w].completas || 0,
     'Comidas libres': round2(weeks[w].thirds / 3),
     'Permitidas': quota,
     'Diferencia': round2(quota - weeks[w].thirds / 3),
   }));
   const ws2 = XLSX.utils.json_to_sheet(summary, {
-    header: ['Semana desde', 'Comidas fuera del plan', 'Alcohol', 'Dulce', 'Comidas libres', 'Permitidas', 'Diferencia'],
+    header: ['Semana desde', 'Comidas fuera del plan', 'Alcohol', 'Dulce', 'Completas', 'Comidas libres', 'Permitidas', 'Diferencia'],
   });
 
   const months = {};
@@ -1172,14 +1211,16 @@ async function exportXlsx() {
     const mo = months[k] || (months[k] = { thirds: 0, comida: 0, alcohol: 0, postre: 0 });
     mo.thirds += thirdsOf(e);
     for (const [p] of PARTS) if (e.partes[p]) mo[p]++;
+    if (e.completa) mo.completas = (mo.completas || 0) + 1;
   }
   const ws3 = XLSX.utils.json_to_sheet(Object.keys(months).sort().map((k) => ({
     'Mes': k,
     'Comidas fuera del plan': months[k].comida,
     'Alcohol': months[k].alcohol,
     'Dulce': months[k].postre,
+    'Completas': months[k].completas || 0,
     'Comidas libres': round2(months[k].thirds / 3),
-  })), { header: ['Mes', 'Comidas fuera del plan', 'Alcohol', 'Dulce', 'Comidas libres'] });
+  })), { header: ['Mes', 'Comidas fuera del plan', 'Alcohol', 'Dulce', 'Completas', 'Comidas libres'] });
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Comidas');
@@ -1224,7 +1265,7 @@ function cellToTime(v) {
 
 const yes = (v) => /^(s[ií]|si|x|1|true|verdadero)$/i.test(String(v).trim());
 
-function cellsToParts(row) {
+function cellsToParts(row, completa) {
   // "Postre" was the column name before it was renamed to "Dulce"
   if (!('Dulce' in row) && 'Postre' in row) row = { ...row, Dulce: row.Postre };
   const cols = PARTS.map(([k]) => COLUMNS.find(([c]) => c === k)[1]);
@@ -1232,7 +1273,7 @@ function cellsToParts(row) {
   if (!cols.some((h) => h in row)) return { comida: true, alcohol: true, postre: true };
   const partes = {};
   PARTS.forEach(([k], i) => { partes[k] = yes(row[cols[i]]); });
-  if (!thirdsOf({ partes })) partes.comida = true;
+  if (!completa && !partsOf({ partes })) partes.comida = true;
   return partes;
 }
 
@@ -1249,7 +1290,8 @@ async function importXlsx(file) {
       fecha: cellToDate(e.fecha),
       hora: cellToTime(e.hora),
       momento: MEALS.includes(e.momento) ? e.momento : 'Snack',
-      partes: cellsToParts(r),
+      completa: yes(r['Completa (1 comida libre)']),
+      partes: cellsToParts(r, yes(r['Completa (1 comida libre)'])),
       descripcion: String(e.descripcion || ''),
       lugar: String(e.lugar || ''),
       disfrute: Math.max(0, Math.min(5, parseInt(e.disfrute, 10) || 0)),
@@ -1283,6 +1325,31 @@ $('fileInput').onchange = async (ev) => {
   if (f) importXlsx(f).catch(() => toast('No se pudo leer el archivo'));
 };
 
+
+// ---------- "damage" feedback when a free meal is added ----------
+
+// Red vignette + a short shake + a floating "−⅓ 💔" from the key. A whole free meal hits harder.
+function hurt(thirds, from, heavy = thirds >= 3) {
+  if (!thirds) return;
+  const fx = $('hurt');
+  fx.classList.remove('hit', 'big');
+  void fx.offsetWidth; // restart the animation
+  fx.classList.add('hit');
+  if (heavy) fx.classList.add('big');
+  const main = document.querySelector('main');
+  main.classList.remove('shake', 'shake-big');
+  void main.offsetWidth;
+  main.classList.add(heavy ? 'shake-big' : 'shake');
+  if (from) {
+    const r = from.getBoundingClientRect();
+    const f = Object.assign(document.createElement('div'), { className: 'dmg' + (heavy ? ' big' : ''), textContent: `−${fmtThirds(thirds)} 💔` });
+    f.style.left = `${r.left + r.width / 2}px`;
+    f.style.top = `${r.top + r.height * 0.3}px`;
+    document.body.appendChild(f);
+    setTimeout(() => f.remove(), 1100);
+  }
+  if (navigator.vibrate) navigator.vibrate(heavy ? [40, 60, 80] : 35);
+}
 
 // ---------- misc ----------
 

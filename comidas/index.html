@@ -31,6 +31,8 @@
     --alcohol-deep: #93224a;
     --postre: #f7a8cb;     /* strawberry milk */
     --postre-deep: #c06d93;
+    --completa: #b58cff;   /* lavender: a whole free meal */
+    --completa-deep: #7d55c9;
     --over: #ff7a6b;       /* status: te pasaste */
     --good: #34d3c0;       /* status: limpia / vas bien */
     --font: "Bricolage", ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
@@ -174,6 +176,19 @@
   .key[data-part="postre"] { --c: var(--postre); --d: var(--postre-deep); }
   .key:active, .key.pressed { transform: translateY(6px); box-shadow: 0 1px 0 var(--d); }
   .key .emoji { font-size: 46px; line-height: 1; }
+  .key.wide {
+    grid-column: 1 / -1; min-height: 60px; flex-direction: row; gap: 10px; padding: 10px 16px;
+    --c: var(--panel); --d: var(--ink-deep); color: var(--paper);
+    border: 2px solid var(--completa); box-shadow: 0 5px 0 var(--completa-deep);
+  }
+  .key.wide:active, .key.wide.pressed { box-shadow: 0 1px 0 var(--completa-deep); transform: translateY(4px); }
+  .key.wide .emoji { font-size: 26px; }
+  .key.wide .name { font-size: 16px; }
+  .key.wide .val {
+    margin-left: auto; font-weight: 800; font-size: 15px; color: var(--ink-deep);
+    background: var(--completa); border-radius: 999px; padding: 2px 10px;
+  }
+  .key.wide .done { top: 50%; right: 50px; transform: translateY(-50%); }
   .key .name { font-size: 18px; font-weight: 700; line-height: 1.1; text-align: center; }
   .key .done {
     position: absolute; top: 8px; right: 10px; font-size: 13px; font-weight: 700;
@@ -325,6 +340,35 @@
   .parts button span { font-size: 26px; filter: grayscale(1); opacity: .5; }
   .parts button[aria-pressed="true"] { border-color: var(--paper); background: var(--ink); }
   .parts button[aria-pressed="true"] span { filter: none; opacity: 1; }
+  .parts .wide { grid-column: 1 / -1; flex-direction: row; justify-content: center; gap: 8px; padding: 10px; }
+  .parts .wide span { font-size: 20px; }
+  .parts .wide[aria-pressed="true"] { border-color: var(--completa); }
+
+  /* ---------- damage feedback ---------- */
+  .hurt {
+    position: fixed; inset: 0; z-index: 40; pointer-events: none; opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 35%, rgb(200 0 20 / .55) 75%, rgb(140 0 10 / .85) 100%);
+  }
+  .hurt.hit { animation: hurt .7s ease-out; }
+  .hurt.hit.big { animation: hurt-big 1.1s ease-out; background: radial-gradient(ellipse at center, rgb(160 0 10 / .25) 20%, rgb(200 0 20 / .7) 65%, rgb(120 0 10 / .95) 100%); }
+  @keyframes hurt { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes hurt-big { 0% { opacity: 0; } 8% { opacity: 1; } 30% { opacity: .55; } 42% { opacity: 1; } 100% { opacity: 0; } }
+  main.shake { animation: shake .32s cubic-bezier(.36, .07, .19, .97); }
+  main.shake-big { animation: shake-big .55s cubic-bezier(.36, .07, .19, .97); }
+  @keyframes shake { 20%, 60% { transform: translateX(-5px); } 40%, 80% { transform: translateX(5px); } }
+  @keyframes shake-big { 10%, 50%, 90% { transform: translate(-9px, 2px) rotate(-.4deg); } 30%, 70% { transform: translate(9px, -2px) rotate(.4deg); } }
+  .dmg {
+    position: fixed; z-index: 41; pointer-events: none; transform: translate(-50%, -50%);
+    font-size: 26px; font-weight: 800; color: #ff3b3b; white-space: nowrap;
+    text-shadow: 0 2px 0 #5a0008, 0 0 18px rgb(255 0 0 / .6);
+    animation: dmg 1.05s ease-out forwards;
+  }
+  .dmg.big { font-size: 38px; }
+  @keyframes dmg {
+    0% { opacity: 0; transform: translate(-50%, -30%) scale(.6); }
+    15% { opacity: 1; transform: translate(-50%, -60%) scale(1.15); }
+    100% { opacity: 0; transform: translate(-50%, -190%) scale(1); }
+  }
   .actions { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
   .solid {
     border: 0; border-radius: 14px; padding: 14px; font-size: 17px; font-weight: 700;
@@ -374,8 +418,9 @@
     <button class="key" data-part="comida" type="button"><span class="emoji">🍔</span><span class="name">Comida</span></button>
     <button class="key" data-part="alcohol" type="button"><span class="emoji">🍷</span><span class="name">Alcohol</span></button>
     <button class="key" data-part="postre" type="button"><span class="emoji">🍰</span><span class="name">Dulce</span></button>
+    <button class="key wide" data-part="completa" type="button"><span class="emoji">🍽️</span><span class="name">Comida libre completa</span><span class="val">1</span></button>
   </section>
-  <p class="hint">Cada toque suma ⅓ y otro toque lo saca. Las tres juntas son una comida libre.</p>
+  <p class="hint">Cada toque suma ⅓ y otro toque lo saca. Las tres juntas, o la tecla de abajo, son una comida libre.</p>
 
     <section class="log">
       <h2 id="dayTitle">Registros de hoy</h2>
@@ -495,6 +540,7 @@
   </div>
 </div>
 
+<div class="hurt" id="hurt" aria-hidden="true"></div>
 <div class="toast" id="toast" role="status"><span id="toastMsg"></span><button type="button" id="toastUndo">Deshacer</button></div>
 
 <script src="vendor/xlsx.mini.min.js"></script>
