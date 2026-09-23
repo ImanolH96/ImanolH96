@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '37';
+const APP_VERSION = '39';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -368,6 +368,29 @@ function weekStatus(used, quota, finished) {
 // "1 comida libre", "2 comidas libres"
 // Over the weekly quota, show the quota plus the extra: "1+2" (thirds in, text out).
 const fmtUsed = (used, quota) => (used > quota ? `${fmtThirds(quota)}+${fmtThirds(used - quota)}` : fmtThirds(used));
+// A month is made of whole weeks: each week belongs to the month holding most of its days
+// (its 4th day). September 2026 = 31 ago–27 sept, 4 weeks; the week of 28 sept goes to October.
+function monthSpan(y, m) {
+  const weeks = [];
+  let [from, to] = weekBounds(new Date(y, m, 1));
+  for (;;) {
+    const mid = parseDate(from); mid.setDate(mid.getDate() + 3);
+    if (mid.getFullYear() > y || (mid.getFullYear() === y && mid.getMonth() > m)) break;
+    if (mid.getMonth() === m) weeks.push([from, to]);
+    const n = parseDate(from); n.setDate(n.getDate() + 7); from = isoDate(n);
+    const t = new Date(n); t.setDate(t.getDate() + 6); to = isoDate(t);
+  }
+  const f = weeks[0][0], t = weeks[weeks.length - 1][1];
+  return { from: f, to: t, weeks, days: Math.round((parseDate(t) - parseDate(f)) / 864e5) + 1 };
+}
+
+// Monthly allowance in thirds: weekly quota × the month's weeks (2 × 4 = 8).
+function monthAllowance(y, m) {
+  return (Number(state.settings.quota) || 0) * 3 * monthSpan(y, m).weeks.length;
+}
+
+const spanLabel = (sp) => weekRangeLabel(sp.from, sp.to, true);
+
 const mealsWord = (n) => `${n} ${n === 1 ? 'comida libre' : 'comidas libres'}`;
 
 // Progress bar in thirds: a tick at every whole free meal, a marker at the quota,
@@ -585,12 +608,14 @@ $('todaySummary').onclick = () => { goWeek(0); showTab('semana'); };
 
 function renderMonth() {
   const y = monthRef.getFullYear(), m = monthRef.getMonth();
-  const first = isoDate(new Date(y, m, 1));
-  const last = isoDate(new Date(y, m + 1, 0));
+  const span = monthSpan(y, m);
+  const first = span.from;
+  const last = span.to;
   const title = MONTH(monthRef);
   $('monthTitle').textContent = title.charAt(0).toUpperCase() + title.slice(1) + (y !== new Date().getFullYear() ? ` ${y}` : '');
   const now = new Date();
-  $('moNext').disabled = y === now.getFullYear() && m === now.getMonth();
+  const todayIso = isoDate(now);
+  $('moNext').disabled = monthSpan(m === 11 ? y + 1 : y, (m + 1) % 12).from > todayIso;
 
   const inMonth = state.entries.filter((e) => e.fecha >= first && e.fecha <= last);
   const total = inMonth.reduce((n, e) => n + thirdsOf(e), 0);
@@ -598,11 +623,11 @@ function renderMonth() {
   const counts = PARTS.map(([k, , icon]) => `${icon} ${inMonth.filter((e) => e.partes[k]).length}`).join('   ')
     + (nCompletas ? `   🍽️ ${nCompletas}` : '');
   $('monthTotal').innerHTML = '';
-  const allowed = Math.round(((Number(state.settings.quota) || 0) * new Date(y, m + 1, 0).getDate() / 7) * 3);
+  const allowed = monthAllowance(y, m);
   // compare against what the month allows up to today (whole month once it's over)
-  const isCur = y === now.getFullYear() && m === now.getMonth();
-  const daysSoFar = isCur ? now.getDate() : new Date(y, m + 1, 0).getDate();
-  const allowedSoFar = Math.round(((Number(state.settings.quota) || 0) * daysSoFar / 7) * 3);
+  const isCur = todayIso >= first && todayIso <= last;
+  const daysSoFar = isCur ? Math.round((parseDate(todayIso) - parseDate(first)) / 864e5) + 1 : span.days;
+  const allowedSoFar = Math.round((allowed * daysSoFar) / span.days);
   let mst;
   if (!total) mst = { key: 'clean', icon: '★', label: 'Mes limpio' };
   else if (total > allowed) mst = { key: 'over', icon: '!', label: 'Por encima del límite' };
@@ -611,6 +636,7 @@ function renderMonth() {
   $('monthTotal').append(
     Object.assign(document.createElement('b'), { textContent: fmtThirds(total) }),
     ` de ${fmtThirds(allowed)} comidas libres en el mes`,
+    Object.assign(document.createElement('span'), { textContent: `${span.weeks.length} semanas, del ${spanLabel(span)}` }),
     Object.assign(document.createElement('span'), { textContent: counts }),
   );
   $('monthStatus').innerHTML = '';
@@ -618,19 +644,19 @@ function renderMonth() {
   const reservedMonth = isCur ? plannedBetween(isoDate(now), last) : 0;
   // what's left counts the events already planned for the rest of the month
   $('monthAdvice').textContent = isCur
-    ? monthAdvice(total + reservedMonth, allowed, new Date(y, m + 1, 0).getDate() - now.getDate() + 1, new Date(y, m + 1, 0))
+    ? monthAdvice(total + reservedMonth, allowed, span.days - daysSoFar + 1, parseDate(last))
       + (reservedMonth ? ` Ya descuenta ${fmtThirds(reservedMonth)} reservado para eventos.` : '')
     : '';
 
   renderChart(y, m, inMonth);
 
-  // every week that touches the month, counted whole
+  // the month's weeks
   const quota = (Number(state.settings.quota) || 0) * 3;
   const ul = $('monthWeeks');
   ul.innerHTML = '';
-  let [from, to] = weekBounds(parseDate(first));
-  const today = isoDate(now);
-  while (from <= last && from <= today) {
+  const today = todayIso;
+  for (const [from, to] of span.weeks) {
+    if (from > today) break;
     const used = thirdsBetween(from, to);
     const offset = weekOffsetOf(from);
     const li = document.createElement('li');
@@ -654,10 +680,6 @@ function renderMonth() {
     b.setAttribute('aria-label', `Semana del ${weekRangeLabel(from, to)}: ${fmtThirds(used)} de ${quota / 3}, ${st.label}. Ver semana`);
     li.appendChild(b);
     ul.appendChild(li);
-    const next = parseDate(from); next.setDate(next.getDate() + 7);
-    from = isoDate(next);
-    const end = new Date(next); end.setDate(end.getDate() + 6);
-    to = isoDate(end);
   }
 }
 
@@ -667,8 +689,8 @@ function monthAdvice(used, allowed, daysLeft, lastDate) {
   const quota = (Number(state.settings.quota) || 0) * 3;
   const left = allowed - used;
   const dias = daysLeft === 1 ? 'hoy' : `los ${daysLeft} días que faltan`;
-  const next = new Date(lastDate.getFullYear(), lastDate.getMonth() + 1, 1);
-  const restart = `El 1 de ${MONTH(next)} arranca un mes nuevo.`;
+  const next = new Date(lastDate); next.setDate(next.getDate() + 1);
+  const restart = `El ${next.toLocaleDateString('es', { weekday: 'long', day: 'numeric' })} arranca un mes nuevo.`;
   if (left < 0) return `Este mes ya estás ${fmtThirds(-left)} por encima del límite. ${restart}`;
   if (left === 0) return `Llegaste justo al límite del mes. ${restart}`;
   if (daysLeft < 7) return `Te quedan ${fmtThirds(left)} para ${dias} del mes.`;
@@ -690,17 +712,21 @@ function el(name, attrs, parent) {
 let chartData = null; // what the hover layer reads
 
 function renderCumulative(y, m, inMonth) {
-  const days = new Date(y, m + 1, 0).getDate();
-  const now = new Date();
-  const isCurrent = y === now.getFullYear() && m === now.getMonth();
-  const lastDay = isCurrent ? now.getDate() : days; // don't draw the future
+  const span = monthSpan(y, m);
+  const days = span.days;
+  const start = parseDate(span.from);
+  const dateAt = (i) => { const d = new Date(start); d.setDate(d.getDate() + i - 1); return d; };
+  const idx = (iso) => Math.round((parseDate(iso) - start) / 864e5) + 1;
+  const today = isoDate(new Date());
+  const isCurrent = today >= span.from && today <= span.to;
+  const lastDay = isCurrent ? idx(today) : days; // don't draw the future
 
-  const perDay = new Array(days + 1).fill(0); // thirds logged on each day
-  for (const e of inMonth) perDay[Number(e.fecha.slice(8, 10))] += thirdsOf(e);
+  const perDay = new Array(days + 1).fill(0); // thirds logged on each day of the span
+  for (const e of inMonth) perDay[idx(e.fecha)] += thirdsOf(e);
   const cum = [0];
   for (let d = 1; d <= days; d++) cum[d] = cum[d - 1] + perDay[d];
   const quota = Number(state.settings.quota) || 0;
-  const pace = (d) => (quota * d) / 7; // allowed free meals by the end of day d
+  const pace = (d) => (monthAllowance(y, m) / 3) * (d / days); // allowed free meals by the end of day d
 
   const W = 340, H = 180, L = 26, R = 40, T = 12, B = 24;
   const maxY = Math.max(1, Math.ceil(Math.max(cum[lastDay] / 3, pace(days))));
@@ -718,9 +744,10 @@ function renderCumulative(y, m, inMonth) {
     el('text', { x: L - 8, y: yv(v) + 4, class: 'tick', 'text-anchor': 'end' }, svg).textContent = v;
   }
   // x ticks: weekly-ish plus the last day
-  for (const d of [1, 8, 15, 22, days]) {
-    el('text', { x: x(d), y: H - 6, class: 'tick', 'text-anchor': 'middle' }, svg).textContent = d;
+  for (let d = 1; d <= days; d += 7) {
+    el('text', { x: x(d), y: H - 6, class: 'tick', 'text-anchor': 'middle' }, svg).textContent = dateAt(d).getDate();
   }
+  el('text', { x: x(days), y: H - 6, class: 'tick', 'text-anchor': 'middle' }, svg).textContent = dateAt(days).getDate();
 
   // allowed pace
   el('line', { x1: x(0.5), y1: yv(pace(0)), x2: x(days + 0.5), y2: yv(pace(days)), class: 'pace' }, svg);
@@ -751,11 +778,11 @@ function renderCumulative(y, m, inMonth) {
   const cross = el('line', { y1: T, y2: H - B, class: 'cross', visibility: 'hidden' }, svg);
   const dot = el('circle', { r: 5, class: 'end', visibility: 'hidden' }, svg);
   el('rect', { x: L, y: 0, width: W - L - R, height: H, class: 'hit' }, svg);
-  chartData = { y, m, days, lastDay, perDay, cum, pace, x, yv, W, L, R, cross, dot };
+  chartData = { y, m, days, lastDay, perDay, cum, pace, x, yv, W, L, R, cross, dot, dateAt };
 
   // table view for screen readers
   const rows = [];
-  for (let i = 1; i <= lastDay; i++) if (perDay[i]) rows.push(`<tr><td>${i}</td><td>${fmtThirds(perDay[i])}</td><td>${fmtThirds(cum[i])}</td></tr>`);
+  for (let i = 1; i <= lastDay; i++) if (perDay[i]) rows.push(`<tr><td>${dateAt(i).getDate()}</td><td>${fmtThirds(perDay[i])}</td><td>${fmtThirds(cum[i])}</td></tr>`);
   $('chartTable').innerHTML = `<caption>Comidas libres por día en ${MONTH(new Date(y, m, 1))}</caption>`
     + '<tr><th>Día</th><th>Ese día</th><th>Acumulado</th></tr>' + rows.join('');
   hideTip();
@@ -776,7 +803,7 @@ function showTip(ev) {
   const cx = c.x(day);
   c.cross.setAttribute('x1', cx); c.cross.setAttribute('x2', cx); c.cross.setAttribute('visibility', 'visible');
   c.dot.setAttribute('cx', cx); c.dot.setAttribute('cy', c.yv(c.cum[day] / 3)); c.dot.setAttribute('visibility', 'visible');
-  const date = new Date(c.y, c.m, day).toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' });
+  const date = c.dateAt(day).toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' });
   const tip = $('chartTip');
   tip.innerHTML = '';
   tip.append(
@@ -831,7 +858,7 @@ function renderChart(y, m, inMonth) {
   if (view === 'acum') renderCumulative(y, m, inMonth);
   else if (view === 'semanas') renderWeekly(y, m);
   else if (view === 'momentos') renderMoments(y, m, inMonth);
-  else renderCalendar(y, m, inMonth);
+  else renderCalendar(y, m, state.entries); // the heatmap is a calendar grid, so it shows calendar days
   renderLegend(view);
 }
 
@@ -882,16 +909,12 @@ const tipLines = (title, c) => [title,
   `Total: ${fmtThirds(totalOf(c))}`].join('\n');
 
 function renderWeekly(y, m) {
-  const first = isoDate(new Date(y, m, 1));
-  const last = isoDate(new Date(y, m + 1, 0));
   const today = isoDate(new Date());
   const weeks = [];
-  let [from, to] = weekBounds(parseDate(first));
-  while (from <= last && from <= today) {
+  for (const [from, to] of monthSpan(y, m).weeks) {
+    if (from > today) break;
     const list = state.entries.filter((e) => e.fecha >= from && e.fecha <= to);
     weeks.push({ from, to, c: partCounts(list) });
-    const n = parseDate(from); n.setDate(n.getDate() + 7); from = isoDate(n);
-    const t = new Date(n); t.setDate(t.getDate() + 6); to = isoDate(t);
   }
   const quota = Number(state.settings.quota) || 0;
   const W = 340, H = 210, L = 26, R = 42, T = 44, B = 26;
@@ -1376,9 +1399,9 @@ function renderPlan() {
   const now = new Date();
   const today = isoDate(now);
   const isCur = y === now.getFullYear() && m === now.getMonth();
-  const first = isoDate(new Date(y, m, 1));
-  const last = isoDate(new Date(y, m + 1, 0));
-  const days = new Date(y, m + 1, 0).getDate();
+  const span = monthSpan(y, m);
+  const first = span.from;
+  const last = span.to;
   const title = MONTH(planMonth);
   $('planMonthTitle').textContent = title.charAt(0).toUpperCase() + title.slice(1) + (y !== now.getFullYear() ? ` ${y}` : '');
   $('planPrev').disabled = isCur;
@@ -1387,7 +1410,7 @@ function renderPlan() {
 
   // month budget: allowed vs used (logged) vs reserved (planned, not logged yet)
   const quota = Number(state.settings.quota) || 0;
-  const allowed = Math.round(((quota * days) / 7) * 3);
+  const allowed = monthAllowance(y, m);
   const used = state.entries.filter((e) => e.fecha >= first && e.fecha <= last).reduce((n, e) => n + thirdsOf(e), 0);
   const reserved = plannedBetween(first, last);
   const free = allowed - used - reserved;
@@ -1409,13 +1432,13 @@ function renderPlan() {
     return it;
   };
   legend.append(item('lg-used', 'Usadas', used), item('lg-res', 'Reservadas', reserved), item('lg-free', 'Límite', allowed));
-  card.append(big, bar, legend);
+  const note = Object.assign(document.createElement('p'), { className: 'plan-span', textContent: `${span.weeks.length} semanas × ${quota} = ${fmtThirds(allowed)}, del ${spanLabel(span)}` });
+  card.append(big, bar, legend, note);
 
   // week by week: does each week fit its quota with what's planned?
   const wl = $('planWeeks');
   wl.innerHTML = '';
-  let [from, to] = weekBounds(parseDate(first));
-  while (from <= last) {
+  for (const [from, to] of span.weeks) {
     if (to >= today) {
       const u = thirdsBetween(from, to);
       const r = plannedBetween(from > today ? from : today, to);
@@ -1430,8 +1453,6 @@ function renderPlan() {
         progressBar(u, q, r), statusPill(st));
       wl.appendChild(li);
     }
-    const n = parseDate(from); n.setDate(n.getDate() + 7); from = isoDate(n);
-    const t = new Date(n); t.setDate(t.getDate() + 6); to = isoDate(t);
   }
 
   const synced = state.settings.gcalLastSync;
