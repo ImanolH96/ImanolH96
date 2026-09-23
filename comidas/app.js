@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '35';
+const APP_VERSION = '36';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -1775,8 +1775,18 @@ function gcalHandleRedirect() {
   history.replaceState(null, '', location.pathname + location.search);
   let expected = null;
   try { expected = sessionStorage.getItem('comidas-libres:gcal-state'); } catch (e) { /* ignore */ }
-  if (p.get('error')) { toast('No se conectó Google Calendar (permiso rechazado).'); return; }
-  if (expected && p.get('state') !== expected) { toast('La conexión con Google no se pudo verificar. Probá de nuevo.'); return; }
+  if (p.get('error')) {
+    const code = p.get('error');
+    const hint = code === 'access_denied'
+      ? 'Se canceló el permiso, o tu mail no está en "Usuarios de prueba" de Google Cloud.'
+      : 'Google rechazó la conexión.';
+    gcalError(hint, `Paso: volver de Google\nerror: ${code}${p.get('error_description') ? `\n${p.get('error_description')}` : ''}`);
+    return;
+  }
+  if (expected && p.get('state') !== expected) {
+    gcalError('La conexión con Google no se pudo verificar. Probá de nuevo.', 'Paso: volver de Google\nerror: state no coincide');
+    return;
+  }
   const token = p.get('access_token');
   const exp = Date.now() + (Number(p.get('expires_in')) || 3600) * 1000;
   try { sessionStorage.setItem(GCAL_TOKEN_KEY, JSON.stringify({ token, exp })); } catch (e) { /* ignore */ }
@@ -1793,7 +1803,13 @@ async function gcalGet(token, path, params = {}) {
     try { sessionStorage.removeItem(GCAL_TOKEN_KEY); } catch (e) { /* ignore */ }
     throw new Error('auth');
   }
-  if (!res.ok) throw new Error('http ' + res.status);
+  if (!res.ok) {
+    let detail = '';
+    try { const j = await res.json(); detail = (j.error && (j.error.message || j.error.status)) || ''; } catch (e) { /* not JSON */ }
+    const err = new Error('http');
+    err.detail = `Paso: leer ${path.split('?')[0]}\nHTTP ${res.status}${detail ? `\n${detail}` : ''}`;
+    throw err;
+  }
   return res.json();
 }
 
@@ -1839,8 +1855,24 @@ async function gcalSync(token) {
     showCandidates(events);
   } catch (e) {
     if (e.message === 'auth') { toast('La sesión de Google venció. Tocá de nuevo para reconectar.'); return; }
-    toast('No pude leer Google Calendar. Revisá la conexión y probá de nuevo.');
+    gcalError('No pude leer Google Calendar.', e.detail || `Paso: leer eventos\n${e.name}: ${e.message}`);
   }
+}
+
+// Errors stay on screen with the exact detail, so it can be copied and reported.
+function gcalError(msg, detail) {
+  $('dialogMsg').textContent = msg;
+  const box = $('dialogActions');
+  box.innerHTML = '';
+  box.appendChild(Object.assign(document.createElement('pre'), { className: 'err-detail', textContent: detail }));
+  const copy = Object.assign(document.createElement('button'), { type: 'button', className: 'solid', textContent: 'Copiar detalle' });
+  copy.onclick = () => {
+    navigator.clipboard?.writeText(detail).then(() => { copy.textContent = 'Copiado'; }, () => { copy.textContent = 'Seleccioná el texto para copiarlo'; });
+  };
+  const close = Object.assign(document.createElement('button'), { type: 'button', className: 'link', textContent: 'Cerrar' });
+  close.onclick = () => closeSheet('dialog');
+  box.append(copy, close);
+  openSheet('dialog');
 }
 
 $('gcalBtn').onclick = gcalConnect;
