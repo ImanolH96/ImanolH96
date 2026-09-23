@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '33';
+const APP_VERSION = '34';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -1151,6 +1151,7 @@ $('btnSettings').onclick = () => {
   $('sQuota').value = state.settings.quota;
   $('sWeekStart').value = String(state.settings.weekStart);
   for (const m of Object.keys(DEFAULT_RANGES)) $(`sRange${m}`).value = state.settings.ranges[m];
+  $('sGcal').value = state.settings.gcalClientId || '';
   openSheet('settingsSheet');
 };
 
@@ -1165,6 +1166,7 @@ $('btnSaveSettings').onclick = () => {
   state.settings.quota = Math.max(0, parseInt($('sQuota').value, 10) || 0);
   state.settings.weekStart = Number($('sWeekStart').value);
   state.settings.ranges = ranges;
+  state.settings.gcalClientId = $('sGcal').value.trim();
   persist();
   closeSheet('settingsSheet');
   render();
@@ -1432,6 +1434,11 @@ function renderPlan() {
     const t = new Date(n); t.setDate(t.getDate() + 6); to = isoDate(t);
   }
 
+  const synced = state.settings.gcalLastSync;
+  $('gcalNote').textContent = synced
+    ? `Última búsqueda en Google Calendar: ${new Date(synced).toLocaleDateString('es', { day: 'numeric', month: 'short' })}, ${new Date(synced).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}`
+    : '';
+
   // the events themselves
   const list = $('planList');
   list.innerHTML = '';
@@ -1649,8 +1656,15 @@ async function importICS(file) {
   const now = new Date();
   const from = isoDate(now);
   const end = new Date(now.getFullYear(), now.getMonth() + 7, 0);
-  const found = parseICS(text, from, isoDate(end))
+  showCandidates(parseICS(text, from, isoDate(end)));
+}
+
+// Shared by the .ics import and the Google Calendar sync: pick which events become plans.
+function showCandidates(events) {
+  const seen = new Set();
+  const found = events
     .filter((c) => !state.plans.some((p) => p.fecha === c.fecha && p.nombre === c.nombre))
+    .filter((c) => { const k = c.fecha + '|' + c.nombre; if (seen.has(k)) return false; seen.add(k); return true; })
     .sort((a, b) => a.fecha.localeCompare(b.fecha));
   if (!found.length) { toast('No encontré eventos nuevos en los próximos 6 meses'); return; }
   icsCandidates = found.map((c) => ({
@@ -1705,6 +1719,131 @@ $('icsSave').onclick = () => {
   render();
   toast(`${chosen.length} ${chosen.length === 1 ? 'evento reservado' : 'eventos reservados'} desde el calendario`);
 };
+
+
+// ---- Google Calendar: read events with the user's Google account (OAuth, read-only) ----
+// Needs a Google Cloud OAuth "Web" client ID whose authorized JavaScript origin is where the app
+// is published (e.g. https://imanolh96.github.io). Uses the redirect flow: it works in Safari and
+// in the home-screen app, where OAuth popups don't come back.
+
+const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
+const GCAL_TOKEN_KEY = 'comidas-libres:gcal-token';
+
+function gcalRedirectUri() {
+  return location.origin + location.pathname;
+}
+
+function gcalToken() {
+  try {
+    const t = JSON.parse(sessionStorage.getItem(GCAL_TOKEN_KEY) || 'null');
+    return t && t.exp > Date.now() + 60000 ? t.token : null;
+  } catch (e) { return null; }
+}
+
+function gcalConnect() {
+  const clientId = (state.settings.gcalClientId || '').trim();
+  if (window.top !== window || location.protocol !== 'https:') {
+    toast('Google Calendar funciona en la app publicada (GitHub Pages), no en esta vista.');
+    return;
+  }
+  if (!clientId) {
+    toast('Primero pegá tu Google Client ID en Ajustes.');
+    $('btnSettings').click();
+    return;
+  }
+  const t = gcalToken();
+  if (t) { gcalSync(t); return; }
+  const stateTok = Math.random().toString(36).slice(2);
+  try { sessionStorage.setItem('comidas-libres:gcal-state', stateTok); } catch (e) { /* ignore */ }
+  const q = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: gcalRedirectUri(),
+    response_type: 'token',
+    scope: GCAL_SCOPE,
+    include_granted_scopes: 'true',
+    state: stateTok,
+    prompt: state.settings.gcalConnected ? '' : 'consent',
+  });
+  if (!q.get('prompt')) q.delete('prompt');
+  location.assign('https://accounts.google.com/o/oauth2/v2/auth?' + q);
+}
+
+// Back from Google: the token arrives in the URL fragment.
+function gcalHandleRedirect() {
+  if (!location.hash.includes('access_token=') && !location.hash.includes('error=')) return;
+  const p = new URLSearchParams(location.hash.slice(1));
+  history.replaceState(null, '', location.pathname + location.search);
+  let expected = null;
+  try { expected = sessionStorage.getItem('comidas-libres:gcal-state'); } catch (e) { /* ignore */ }
+  if (p.get('error')) { toast('No se conectó Google Calendar (permiso rechazado).'); return; }
+  if (expected && p.get('state') !== expected) { toast('La conexión con Google no se pudo verificar. Probá de nuevo.'); return; }
+  const token = p.get('access_token');
+  const exp = Date.now() + (Number(p.get('expires_in')) || 3600) * 1000;
+  try { sessionStorage.setItem(GCAL_TOKEN_KEY, JSON.stringify({ token, exp })); } catch (e) { /* ignore */ }
+  state.settings.gcalConnected = true;
+  persist();
+  showTab('plan');
+  gcalSync(token);
+}
+
+async function gcalGet(token, path, params = {}) {
+  const url = 'https://www.googleapis.com/calendar/v3/' + path + '?' + new URLSearchParams(params);
+  const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+  if (res.status === 401) {
+    try { sessionStorage.removeItem(GCAL_TOKEN_KEY); } catch (e) { /* ignore */ }
+    throw new Error('auth');
+  }
+  if (!res.ok) throw new Error('http ' + res.status);
+  return res.json();
+}
+
+async function gcalSync(token) {
+  toast('Buscando eventos en Google Calendar…');
+  try {
+    const now = new Date();
+    const end = new Date(now.getFullYear(), now.getMonth() + 7, 0, 23, 59);
+    const cals = (await gcalGet(token, 'users/me/calendarList', { minAccessRole: 'reader' })).items || [];
+    // calendars shown in the user's Google Calendar, minus holiday calendars
+    const use = cals.filter((c) => c.selected !== false && !/#holiday@/.test(c.id));
+    const out = [];
+    const masters = new Map(); // recurringEventId -> recurrence rules
+    for (const cal of use) {
+      let pageToken;
+      do {
+        const r = await gcalGet(token, `calendars/${encodeURIComponent(cal.id)}/events`, {
+          timeMin: now.toISOString(), timeMax: end.toISOString(), singleEvents: 'true', orderBy: 'startTime', maxResults: '250',
+          ...(pageToken ? { pageToken } : {}),
+        });
+        for (const e of r.items || []) {
+          if (e.status === 'cancelled' || !e.summary) continue;
+          const allDay = !!(e.start && e.start.date);
+          const dt = allDay ? null : new Date(e.start.dateTime);
+          out.push({ fecha: allDay ? e.start.date : isoDate(dt), time: allDay ? null : isoTime(dt), nombre: e.summary.trim(),
+            rec: e.recurringEventId ? { cal: cal.id, id: e.recurringEventId } : null, birthday: e.eventType === 'birthday' });
+        }
+        pageToken = r.nextPageToken;
+      } while (pageToken);
+    }
+    // keep yearly repeats (birthdays, anniversaries), drop weekly/daily ones (meetings, gym…)
+    for (const ev of out) {
+      if (!ev.rec || ev.birthday || masters.has(ev.rec.id)) continue;
+      try {
+        const m = await gcalGet(token, `calendars/${encodeURIComponent(ev.rec.cal)}/events/${encodeURIComponent(ev.rec.id)}`);
+        masters.set(ev.rec.id, (m.recurrence || []).join(';'));
+      } catch (e) { masters.set(ev.rec.id, ''); }
+    }
+    const events = out.filter((ev) => !ev.rec || ev.birthday || /FREQ=YEARLY/.test(masters.get(ev.rec.id)));
+    state.settings.gcalLastSync = new Date().toISOString();
+    persist();
+    renderPlan();
+    showCandidates(events);
+  } catch (e) {
+    if (e.message === 'auth') { toast('La sesión de Google venció. Tocá de nuevo para reconectar.'); return; }
+    toast('No pude leer Google Calendar. Revisá la conexión y probá de nuevo.');
+  }
+}
+
+$('gcalBtn').onclick = gcalConnect;
 
 // ---------- "damage" feedback when a free meal is added ----------
 
@@ -1803,3 +1942,4 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 }
 
 render();
+gcalHandleRedirect();

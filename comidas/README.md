@@ -34,7 +34,24 @@ Cuatro pestañas abajo: **Registrar** (abre siempre en el día de hoy; se puede 
 - Semana por semana: si lo reservado entra en el cupo o cuánto se pasaría.
 - El día del evento aparece en Registrar con un botón para registrarlo; los que ya pasaron quedan con "Registrar".
 - Lo reservado también se ve rayado en la barra de la semana y se descuenta en el ajuste del mes. El Excel suma la hoja `Planificados`.
-- **Importar de Google Calendar**: exportá tu calendario (calendar.google.com → ⚙️ Configuración → Importar y exportar → Exportar; en el iPhone, abrí el .zip en Archivos y tocá el .ics) y elegilo con "Importar de Google Calendar". La app muestra los eventos de los próximos 6 meses (incluye cumpleaños anuales; ignora repeticiones semanales y cancelados), preselecciona los que parecen de comida y reservás los que marques. Los ya reservados no se duplican.
+- **Buscar eventos en Google Calendar** (conexión directa, solo lectura): ver "Conectar Google Calendar" abajo.
+- **O importar un archivo .ics**: exportá tu calendario (calendar.google.com → ⚙️ Configuración → Importar y exportar → Exportar; en el iPhone, abrí el .zip en Archivos y tocá el .ics) y elegilo con "Importar de Google Calendar". La app muestra los eventos de los próximos 6 meses (incluye cumpleaños anuales; ignora repeticiones semanales y cancelados), preselecciona los que parecen de comida y reservás los que marques. Los ya reservados no se duplican.
+
+## Conectar Google Calendar
+
+Funciona en la app publicada (GitHub Pages), no en la vista previa de Claude. Se hace una sola vez:
+
+1. Entrá a https://console.cloud.google.com/ con tu cuenta de Google y creá un proyecto (ej. "Comidas libres").
+2. **APIs y servicios → Biblioteca** → buscá **Google Calendar API** → **Habilitar**.
+3. **APIs y servicios → Pantalla de consentimiento de OAuth** (Google Auth Platform): tipo **Externo**, nombre de la app, tu mail. En **Público / Usuarios de prueba** agregá tu propio mail. Dejala en modo **Prueba** (no hace falta verificarla).
+4. **APIs y servicios → Credenciales → Crear credenciales → ID de cliente de OAuth**:
+   - Tipo: **Aplicación web**
+   - **Orígenes de JavaScript autorizados**: `https://imanolh96.github.io`
+   - **URI de redireccionamiento autorizados**: `https://imanolh96.github.io/ImanolH96/comidas/`
+5. Copiá el **ID de cliente** (termina en `.apps.googleusercontent.com`) y pegalo en la app: ⚙️ Ajustes → **Google Client ID** → Guardar.
+6. En **Planificar** tocá **Buscar eventos en Google Calendar**, iniciá sesión y aceptá el permiso de **solo lectura** del calendario.
+
+La app lee los calendarios visibles (sin feriados) de los próximos 6 meses, conserva cumpleaños y repeticiones anuales, descarta repeticiones semanales y cancelados, y te deja elegir cuáles reservar. El permiso dura una hora; después, el botón vuelve a pedir acceso (sin volver a preguntar el consentimiento). El ID de cliente no es secreto: identifica a la app, no da acceso a tu cuenta.
 
 ## Cómo instalarla en el iPhone
 

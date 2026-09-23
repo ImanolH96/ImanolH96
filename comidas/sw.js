@@ -1,5 +1,5 @@
 // Cache-first service worker: after the first visit the app works fully offline.
-const CACHE = 'comidas-libres-v34';
+const CACHE = 'comidas-libres-v35';
 const ASSETS = ['./', 'index.html', 'app.js', 'vendor/xlsx.mini.min.js', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png', 'fonts/bricolage.woff2'];
 
 self.addEventListener('install', (e) => {
@@ -15,6 +15,7 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-  if (e.request.method !== 'GET') return;
+  // only the app's own files; Google Calendar API calls go straight to the network
+  if (e.request.method !== 'GET' || new URL(e.request.url).origin !== self.location.origin) return;
   e.respondWith(caches.match(e.request, { ignoreSearch: true }).then((hit) => hit || fetch(e.request)));
 });
