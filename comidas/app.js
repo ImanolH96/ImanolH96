@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '40';
+const APP_VERSION = '41';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -65,7 +65,7 @@ let editingId = null;
 let editParts = {};
 let editCompleta = false;
 let weekOffset = 0;       // 0 = this week, 1 = last week, ...
-let monthRef = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })();
+let monthRef = null; // key of the month/cycle shown in Mes (set on first render)
 let freshWedges = 0;      // wedges to animate on next punch render
 
 // Ask iOS not to evict our storage (best effort).
@@ -78,9 +78,14 @@ const isoDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getD
 const isoTime = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 const parseDate = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
 
+// With a plan start date (the nutritionist visit), weeks start on that weekday.
+function weekStartDay() {
+  return state.settings.cycleStart ? parseDate(state.settings.cycleStart).getDay() : state.settings.weekStart;
+}
+
 function weekBounds(ref = new Date()) {
   const start = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
-  const diff = (start.getDay() - state.settings.weekStart + 7) % 7;
+  const diff = (start.getDay() - weekStartDay() + 7) % 7;
   start.setDate(start.getDate() - diff);
   const end = new Date(start);
   end.setDate(end.getDate() + 6);
@@ -170,8 +175,9 @@ function renderWhen() {
 
 let stripOffset = 0; // weeks back from this week shown in the strip
 
-// Logging is limited to the current month.
+// Logging is limited to the current month (or cycle).
 function firstOfMonth() {
+  if (state.settings.cycleStart) { const k = currentMonthKey(); return monthSpan(k.getFullYear(), k.getMonth()).from; }
   const d = new Date();
   return isoDate(new Date(d.getFullYear(), d.getMonth(), 1));
 }
@@ -185,7 +191,8 @@ function renderStrip() {
   const start = parseDate(from);
   const first = firstOfMonth();
   const month = MONTH(new Date());
-  $('stripMonth').textContent = month.charAt(0).toUpperCase() + month.slice(1);
+  const ck = currentMonthKey();
+  $('stripMonth').textContent = state.settings.cycleStart ? `Ciclo ${periodTitle(ck.getFullYear(), ck.getMonth())}` : month.charAt(0).toUpperCase() + month.slice(1);
   $('dayNext').disabled = stripOffset === 0;
   $('dayPrev').disabled = stripOffset >= weekOffsetOf(first);
   $('dayToday').hidden = selected === today && stripOffset === 0;
@@ -371,7 +378,46 @@ function weekStatus(used, quota, finished) {
 const fmtUsed = (used, quota) => (used > quota ? `${fmtThirds(quota)}+${fmtThirds(used - quota)}` : fmtThirds(used));
 // A month is made of whole weeks: each week belongs to the month holding most of its days
 // (its 4th day). September 2026 = 31 ago–27 sept, 4 weeks; the week of 28 sept goes to October.
+// "Months" are addressed by (y, m) keys. Without a plan start they are calendar months; with one
+// (settings.cycleStart) each key is a 4-week cycle counted from the visit: the cycle's key is the
+// visit's month plus the cycle number.
+const CYCLE_DAYS = 28;
+function cycleIndex(y, m) {
+  const c = parseDate(state.settings.cycleStart);
+  return (y * 12 + m) - (c.getFullYear() * 12 + c.getMonth());
+}
+function monthKeyOf(iso) {
+  if (state.settings.cycleStart) {
+    const c = parseDate(state.settings.cycleStart);
+    const k = Math.floor((parseDate(iso) - c) / 864e5 / CYCLE_DAYS);
+    return new Date(c.getFullYear(), c.getMonth() + k, 1);
+  }
+  const d = parseDate(weekBounds(parseDate(iso))[0]);
+  d.setDate(d.getDate() + 3); // a week belongs to the month holding its middle day
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+const currentMonthKey = () => monthKeyOf(isoDate(new Date()));
+
+function periodTitle(y, m) {
+  if (state.settings.cycleStart) return spanLabel(monthSpan(y, m));
+  const t = MONTH(new Date(y, m, 1));
+  return t.charAt(0).toUpperCase() + t.slice(1) + (y !== new Date().getFullYear() ? ` ${y}` : '');
+}
+// "en septiembre" / "en el ciclo"
+const periodIn = (y, m) => (state.settings.cycleStart ? 'en el ciclo' : `en ${MONTH(new Date(y, m, 1))}`);
+
 function monthSpan(y, m) {
+  if (state.settings.cycleStart) {
+    const start = parseDate(state.settings.cycleStart);
+    start.setDate(start.getDate() + CYCLE_DAYS * cycleIndex(y, m));
+    const weeks = [];
+    for (let i = 0; i < CYCLE_DAYS / 7; i++) {
+      const f = new Date(start); f.setDate(f.getDate() + 7 * i);
+      const t = new Date(f); t.setDate(t.getDate() + 6);
+      weeks.push([isoDate(f), isoDate(t)]);
+    }
+    return { from: weeks[0][0], to: weeks[weeks.length - 1][1], weeks, days: CYCLE_DAYS };
+  }
   const weeks = [];
   let [from, to] = weekBounds(new Date(y, m, 1));
   for (;;) {
@@ -610,12 +656,12 @@ $('todaySummary').onclick = () => { goWeek(0); showTab('semana'); };
 // ---------- month ----------
 
 function renderMonth() {
+  if (!monthRef) monthRef = currentMonthKey();
   const y = monthRef.getFullYear(), m = monthRef.getMonth();
   const span = monthSpan(y, m);
   const first = span.from;
   const last = span.to;
-  const title = MONTH(monthRef);
-  $('monthTitle').textContent = title.charAt(0).toUpperCase() + title.slice(1) + (y !== new Date().getFullYear() ? ` ${y}` : '');
+  $('monthTitle').textContent = periodTitle(y, m);
   const now = new Date();
   const todayIso = isoDate(now);
   $('moNext').disabled = monthSpan(m === 11 ? y + 1 : y, (m + 1) % 12).from > todayIso;
@@ -638,7 +684,7 @@ function renderMonth() {
   else mst = { key: 'good', icon: '✓', label: isCur ? 'Vas bien' : 'Dentro del plan' };
   $('monthTotal').append(
     Object.assign(document.createElement('b'), { textContent: fmtThirds(total) }),
-    ` de ${fmtThirds(allowed)} comidas libres en el mes`,
+    ` de ${fmtThirds(allowed)} comidas libres ${state.settings.cycleStart ? 'en el ciclo' : 'en el mes'}`,
     Object.assign(document.createElement('span'), { textContent: `${span.weeks.length} semanas, del ${spanLabel(span)}` }),
     Object.assign(document.createElement('span'), { textContent: counts }),
   );
@@ -690,16 +736,17 @@ function renderMonth() {
 // used/allowed in thirds; daysLeft counts today.
 function monthAdvice(used, allowed, daysLeft, lastDate) {
   const quota = (Number(state.settings.quota) || 0) * 3;
+  const mes = state.settings.cycleStart ? 'ciclo' : 'mes';
   const left = allowed - used;
   const dias = daysLeft === 1 ? 'hoy' : `los ${daysLeft} días que faltan`;
   const next = new Date(lastDate); next.setDate(next.getDate() + 1);
-  const restart = `El ${next.toLocaleDateString('es', { weekday: 'long', day: 'numeric' })} arranca un mes nuevo.`;
-  if (left < 0) return `Este mes ya estás ${fmtThirds(-left)} por encima del límite. ${restart}`;
-  if (left === 0) return `Llegaste justo al límite del mes. ${restart}`;
-  if (daysLeft < 7) return `Te quedan ${fmtThirds(left)} para ${dias} del mes.`;
+  const restart = `El ${next.toLocaleDateString('es', { weekday: 'long', day: 'numeric' })} arranca un ${mes} nuevo.`;
+  if (left < 0) return `Este ${mes} ya estás ${fmtThirds(-left)} por encima del límite. ${restart}`;
+  if (left === 0) return `Llegaste justo al límite del ${mes}. ${restart}`;
+  if (daysLeft < 7) return `Te quedan ${fmtThirds(left)} para ${dias} del ${mes}.`;
   const perWeek = Math.floor((left * 7) / daysLeft); // thirds per week, rounded down
   if (perWeek >= quota) return `Te quedan ${fmtThirds(left)} para ${dias}. Podés seguir con tu cupo normal.`;
-  return `Te quedan ${fmtThirds(left)} para ${dias}: unas ${fmtThirds(perWeek)} por semana para cerrar el mes en el plan.`;
+  return `Te quedan ${fmtThirds(left)} para ${dias}: unas ${fmtThirds(perWeek)} por semana para cerrar el ${mes} en el plan.`;
 }
 
 // ---------- month chart: cumulative free meals vs. allowed pace ----------
@@ -786,7 +833,7 @@ function renderCumulative(y, m, inMonth) {
   // table view for screen readers
   const rows = [];
   for (let i = 1; i <= lastDay; i++) if (perDay[i]) rows.push(`<tr><td>${dateAt(i).getDate()}</td><td>${fmtThirds(perDay[i])}</td><td>${fmtThirds(cum[i])}</td></tr>`);
-  $('chartTable').innerHTML = `<caption>Comidas libres por día en ${MONTH(new Date(y, m, 1))}</caption>`
+  $('chartTable').innerHTML = `<caption>Comidas libres por día ${periodIn(y, m)}</caption>`
     + '<tr><th>Día</th><th>Ese día</th><th>Acumulado</th></tr>' + rows.join('');
   hideTip();
 }
@@ -994,11 +1041,10 @@ function renderMoments(y, m, inMonth) {
     rows.map((r) => [r.meal, r.c.comida, r.c.alcohol, r.c.postre, fmtThirds(totalOf(r.c))]), 'Comidas libres por momento del día');
 }
 
-function renderCalendar(y, m, inMonth) {
-  const days = new Date(y, m + 1, 0).getDate();
-  const ws = state.settings.weekStart;
-  const lead = (new Date(y, m, 1).getDay() - ws + 7) % 7;
-  const rowsN = Math.ceil((lead + days) / 7);
+function renderCalendar(y, m, entries) {
+  const span = monthSpan(y, m);
+  const ws = weekStartDay();
+  const rowsN = span.weeks.length;
   const W = 340, gap = 5, top = 20;
   const cell = (W - gap * 6) / 7;
   const cellH = Math.min(cell, 40);
@@ -1012,25 +1058,27 @@ function renderCalendar(y, m, inMonth) {
     el('text', { x: i * (cell + gap) + cell / 2, y: 12, class: 'tick', 'text-anchor': 'middle' }, svg).textContent = names[(i + ws) % 7];
   }
   const byDay = {};
-  for (const e of inMonth) (byDay[e.fecha] = byDay[e.fecha] || []).push(e);
+  for (const e of entries) (byDay[e.fecha] = byDay[e.fecha] || []).push(e);
   const rows = [];
-  for (let d = 1; d <= days; d++) {
-    const iso = isoDate(new Date(y, m, d));
+  const start = parseDate(span.from);
+  for (let i = 0; i < rowsN * 7; i++) {
+    const dt = new Date(start); dt.setDate(dt.getDate() + i);
+    const iso = isoDate(dt);
     const list = byDay[iso] || [];
     const c = partCounts(list);
     const t = totalOf(c);
-    const i = lead + d - 1;
     const cx = (i % 7) * (cell + gap), cy = top + Math.floor(i / 7) * (cellH + gap);
     const future = iso > today;
-    const date = new Date(y, m, d).toLocaleDateString('es', { weekday: 'long', day: 'numeric' });
+    const date = dt.toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'short' });
     const g = el('g', future ? {} : { 'data-tip': t ? tipLines(date.charAt(0).toUpperCase() + date.slice(1), c) : `${date.charAt(0).toUpperCase() + date.slice(1)}\nSin comidas libres` }, svg);
     el('rect', { x: cx, y: cy, width: cell, height: cellH, rx: 8, class: `heat h${Math.min(3, t)}${future ? ' future' : ''}${iso === today ? ' today' : ''}` }, g);
-    el('text', { x: cx + 6, y: cy + 14, class: t >= 2 ? 'daynum dark' : 'daynum' }, g).textContent = d;
+    const label = dt.getDate() === 1 || i === 0 ? `${dt.getDate()} ${dt.toLocaleDateString('es', { month: 'short' }).replace('.', '')}` : String(dt.getDate());
+    el('text', { x: cx + 6, y: cy + 14, class: t >= 2 ? 'daynum dark' : 'daynum' }, g).textContent = label;
     // secondary encoding: one tiny dot per part logged that day
     SERIES.filter(([k]) => c[k]).forEach(([k], j) => {
       el('circle', { cx: cx + cell - 8 - j * 7, cy: cy + cellH - 8, r: 2.5, fill: t >= 2 ? 'var(--ink-deep)' : PART_COLOR[k] }, g);
     });
-    if (t) rows.push([d, c.comida, c.alcohol, c.postre, fmtThirds(t)]);
+    if (t) rows.push([dt.getDate(), c.comida, c.alcohol, c.postre, fmtThirds(t)]);
   }
   tableFrom(['Día', 'Comida', 'Alcohol', 'Dulce', 'Total'], rows, 'Comidas libres por día');
 }
@@ -1072,11 +1120,8 @@ $('moNext').onclick = () => { monthRef = new Date(monthRef.getFullYear(), monthR
 function goWeek(offset) {
   weekOffset = Math.max(0, offset);
   const [from] = viewedWeek();
-  const d = parseDate(from);
-  d.setDate(d.getDate() + 3); // the month a week "belongs" to: the one holding its middle day
-  monthRef = new Date(d.getFullYear(), d.getMonth(), 1);
-  const now = new Date();
-  if (monthRef > now) monthRef = new Date(now.getFullYear(), now.getMonth(), 1);
+  monthRef = monthKeyOf(from);
+  if (monthRef > currentMonthKey()) monthRef = currentMonthKey();
   render();
 }
 $('wkPrev').onclick = () => goWeek(weekOffset + 1);
@@ -1176,6 +1221,8 @@ $('btnSettings').onclick = () => {
   $('appVersion').textContent = `Versión ${APP_VERSION}`;
   $('sQuota').value = state.settings.quota;
   $('sWeekStart').value = String(state.settings.weekStart);
+  $('sCycle').value = state.settings.cycleStart || '';
+  $('sWeekStart').disabled = !!state.settings.cycleStart;
   for (const m of Object.keys(DEFAULT_RANGES)) $(`sRange${m}`).value = state.settings.ranges[m];
   $('sGcal').value = state.settings.gcalClientId || '';
   openSheet('settingsSheet');
@@ -1191,6 +1238,9 @@ $('btnSaveSettings').onclick = () => {
   }
   state.settings.quota = Math.max(0, parseInt($('sQuota').value, 10) || 0);
   state.settings.weekStart = Number($('sWeekStart').value);
+  const cyc = $('sCycle').value;
+  if (cyc !== (state.settings.cycleStart || '')) { monthRef = null; planMonth = null; stripOffset = 0; weekOffset = 0; }
+  if (cyc) state.settings.cycleStart = cyc; else delete state.settings.cycleStart;
   state.settings.ranges = ranges;
   state.settings.gcalClientId = $('sGcal').value.trim();
   persist();
@@ -1382,7 +1432,7 @@ const PRESETS = [
   ['🍽️', 'Salida a comer', 3, 'Cena'],
   ['🍻', 'After', 1, 'Merienda'],
 ];
-let planMonth = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })();
+let planMonth = null; // key of the month/cycle shown in Planificar (set on first render)
 let editingPlan = null;
 let planValor = 3;
 
@@ -1398,17 +1448,18 @@ function planIcon(p) {
 
 function renderPlan() {
   if (!$('planMonthTitle')) return;
+  if (!planMonth) planMonth = currentMonthKey();
   const y = planMonth.getFullYear(), m = planMonth.getMonth();
   const now = new Date();
   const today = isoDate(now);
-  const isCur = y === now.getFullYear() && m === now.getMonth();
+  const isCur = +planMonth === +currentMonthKey();
   const span = monthSpan(y, m);
   const first = span.from;
   const last = span.to;
-  const title = MONTH(planMonth);
-  $('planMonthTitle').textContent = title.charAt(0).toUpperCase() + title.slice(1) + (y !== now.getFullYear() ? ` ${y}` : '');
-  $('planPrev').disabled = isCur;
-  const limit = new Date(now.getFullYear(), now.getMonth() + 6, 1);
+  $('planMonthTitle').textContent = periodTitle(y, m);
+  const curKey = currentMonthKey();
+  $('planPrev').disabled = planMonth <= curKey;
+  const limit = new Date(curKey.getFullYear(), curKey.getMonth() + 6, 1);
   $('planNext').disabled = planMonth >= limit;
 
   // month budget: allowed vs used (logged) vs reserved (planned, not logged yet)
@@ -1417,7 +1468,7 @@ function renderPlan() {
   const used = state.entries.filter((e) => e.fecha >= first && e.fecha <= last).reduce((n, e) => n + thirdsOf(e), 0);
   const reserved = plannedBetween(first, last);
   const free = allowed - used - reserved;
-  const monthName = MONTH(planMonth);
+  const monthName = state.settings.cycleStart ? 'el ciclo' : MONTH(planMonth);
   const card = $('planBudget');
   card.innerHTML = '';
   card.className = 'plan-budget ' + (free < 0 ? 's-over' : free === 0 ? 's-limit' : 's-good');
@@ -1431,7 +1482,7 @@ function renderPlan() {
   card.append(big, mealTokens(allowed, used, reserved));
   const math = document.createElement('p');
   math.className = 'plan-math';
-  math.textContent = `${fmtThirds(allowed)} del mes − ${fmtThirds(used)} usadas − ${fmtThirds(reserved)} reservadas = ${free < 0 ? '−' + fmtThirds(-free) : fmtThirds(free)}`;
+  math.textContent = `${fmtThirds(allowed)} ${state.settings.cycleStart ? 'del ciclo' : 'del mes'} − ${fmtThirds(used)} usadas − ${fmtThirds(reserved)} reservadas = ${free < 0 ? '−' + fmtThirds(-free) : fmtThirds(free)}`;
   const note = Object.assign(document.createElement('p'), { className: 'plan-span', textContent: `${span.weeks.length} semanas × ${quota}, del ${spanLabel(span)}` });
   card.append(math, note);
 
@@ -1447,7 +1498,7 @@ function renderPlan() {
   list.innerHTML = '';
   const mine = state.plans.filter((p) => p.fecha >= first && p.fecha <= last).sort((a, b) => a.fecha.localeCompare(b.fecha));
   if (!mine.length) {
-    list.appendChild(Object.assign(document.createElement('li'), { className: 'empty', textContent: 'Nada planificado este mes. Sumá cumpleaños, eventos o salidas que ya sabés que vienen.' }));
+    list.appendChild(Object.assign(document.createElement('li'), { className: 'empty', textContent: `Nada planificado ${state.settings.cycleStart ? 'en este ciclo' : 'este mes'}. Sumá cumpleaños, eventos o salidas que ya sabés que vienen.` }));
   }
   for (const p of mine) list.appendChild(planRow(p));
   // past events not registered yet, from any month
@@ -1708,7 +1759,8 @@ function openPlan(id) {
   $('planSheetTitle').textContent = p ? 'Editar evento' : 'Nuevo evento';
   $('pName').value = p ? p.nombre : '';
   const now = new Date();
-  const def = p ? p.fecha : isoDate(planMonth > now ? planMonth : now);
+  const pf = monthSpan(planMonth.getFullYear(), planMonth.getMonth()).from;
+  const def = p ? p.fecha : (pf > isoDate(now) ? pf : isoDate(now));
   $('pDate').min = isoDate(now);
   $('pDate').value = def;
   $('pMeal').innerHTML = MEALS.map((m) => `<option${m === (p ? p.momento : 'Cena') ? ' selected' : ''}>${m}</option>`).join('');
@@ -1726,8 +1778,7 @@ $('planForm').addEventListener('submit', (ev) => {
   const data = { fecha, momento: $('pMeal').value, nombre, valor: planValor };
   if (editingPlan) Object.assign(state.plans.find((x) => x.id === editingPlan), data);
   else state.plans.push({ id: 'p' + Date.now().toString(36), ...data });
-  const d = parseDate(fecha);
-  planMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+  planMonth = monthKeyOf(fecha);
   persist();
   closeSheet('planSheet');
   render();

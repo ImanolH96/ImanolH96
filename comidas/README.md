@@ -19,6 +19,7 @@ Cuatro pestañas abajo: **Registrar** (abre siempre en el día de hoy; se puede 
 - Tarjeta semanal: un círculo de tres porciones por cada comida libre permitida (por defecto 2 por semana, configurable). Si te pasás aparecen círculos extra punteados.
 - Estado con color, ícono y texto en la semana, el mes, el listado de semanas y la gráfica semanal: ★ Semana limpia (0 comidas libres) y ✓ Vas bien / Dentro del plan en verde, = Al límite en blanco, ! Por encima del cupo / del límite en rojo. El mes se compara con lo permitido hasta hoy.
 - Ajuste del mes (solo el mes actual): una frase con lo que queda del mes y cuánto por semana para cerrar en el plan (o, si ya estás por encima del límite, cuánto y cuándo arranca el mes nuevo), y una línea punteada en la gráfica Acumulado con el margen hasta fin de mes.
+- **Ciclo desde la consulta** (⚙️ Ajustes → Fecha de tu consulta): cada "mes" pasa a ser un ciclo de 4 semanas desde esa fecha (ej. 22 sept–19 oct, 20 oct–16 nov) y las semanas empiezan ese día de la semana; límite = 4 × cupo. Sin fecha, se usan los meses del calendario.
 - El mes se cuenta en semanas enteras: cada semana pertenece al mes que tiene la mayoría de sus días, y el límite del mes es cupo semanal × semanas (ej. septiembre 2026: 31 ago–27 sept, 4 semanas × 2 = 8).
 - Navegación por semana con las flechas ‹ ›: la tarjeta y los registros muestran la semana elegida ("Volver a esta semana" regresa).
 - Resumen del mes con sus propias flechas y un selector de gráficas (tocá la gráfica para ver el detalle):
