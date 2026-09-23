@@ -7,7 +7,7 @@ Todo corre en el dispositivo: sin servidor, sin cuentas, sin backend. Funciona o
 
 En Registrar, la tarjeta "Esta semana" dice en grande cuánto te queda ("Te quedan 1⅔ de 2 comidas libres · quedan 5 días") y lo muestra con un plato por comida libre, partido en tercios como la botonera: cada porción usada lleva el color de lo que fue (comida, alcohol, dulce o completa), lo reservado para eventos va rayado y lo que pasa del cupo cae en platos extra con borde rojo ("Te pasaste +⅓").
 
-Al abrir, Registrar cae en la comida que ya tiene algo registrado hoy (la de la hora si tiene; si no, la última registrada); si no hay nada, elige por la hora. En el selector, las comidas con registros tienen borde lavanda y cuánto llevan (ej. "Cena ⅔").
+Al abrir, Registrar cae en la comida que ya tiene algo registrado hoy (la de la hora si tiene; si no, la última registrada); si no hay nada, elige por la hora. En el selector, las comidas con registros ese día llevan un puntito lavanda.
 
 Cuatro pestañas abajo: **Registrar** (abre siempre en el día de hoy; se puede cambiar a ayer u otro día), **Semana**, **Mes** y **Planificar**. Exportar/importar Excel está en ⚙️ Ajustes.
 

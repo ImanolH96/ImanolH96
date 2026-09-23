@@ -180,10 +180,10 @@ function renderWhen() {
     b.textContent = m;
     b.setAttribute('aria-pressed', String(m === meal));
     if (logged[m]) {
-      // meals that already have something logged carry how much, so they're easy to spot
+      // meals that already have something logged get a dot, so they're easy to spot
       b.classList.add('has');
-      b.append(Object.assign(document.createElement('span'), { className: 'amt', textContent: fmtThirds(logged[m]), ariaHidden: 'true' }));
-      b.setAttribute('aria-label', `${m}, ${fmtThirds(logged[m])} registrado`);
+      b.append(Object.assign(document.createElement('span'), { className: 'dot', ariaHidden: 'true' }));
+      b.setAttribute('aria-label', `${m}, con registros`);
     }
     b.onclick = () => {
       // tapping the auto-detected meal again goes back to automatic
