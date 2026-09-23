@@ -193,12 +193,13 @@
   .key .inset { opacity: 0; pointer-events: none; transition: opacity .12s; }
   .key .inset .lipsh { fill: url(#lip); }
   .key.on .inset { opacity: 1; }
-  .key.on[data-part="comida"] .face { fill: #e9ab35; }
-  .key.on[data-part="alcohol"] .face { fill: #cc4270; }
-  .key.on[data-part="postre"] .face { fill: #efa0c3; }
-  .key.on.hub .face { fill: #aa82f6; }
+  .key.on[data-part="comida"] .face { fill: color-mix(in srgb, var(--comida), #000 14%); }
+  .key.on[data-part="alcohol"] .face { fill: color-mix(in srgb, var(--alcohol), #000 14%); }
+  .key.on[data-part="postre"] .face { fill: color-mix(in srgb, var(--postre), #000 14%); }
+  .key.on.hub .face { fill: color-mix(in srgb, var(--completa), #000 14%); }
   .key .face { transition: filter .15s; }
-  .key.pressed .face { filter: brightness(1.12); transition-duration: 0s; }
+  .key.pressed .face { filter: brightness(.9); transition-duration: 0s; }
+  .key.on .emo, .key.on .nm, .key.on .pill { opacity: .88; }
   .key[data-part="comida"] .face { fill: var(--comida); } .key[data-part="comida"] .base { fill: var(--comida-deep); }
   .key[data-part="alcohol"] .face { fill: var(--alcohol); } .key[data-part="alcohol"] .base { fill: var(--alcohol-deep); }
   .key[data-part="postre"] .face { fill: var(--postre); } .key[data-part="postre"] .base { fill: var(--postre-deep); }
