@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '57';
+const APP_VERSION = '58';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -9,6 +9,9 @@ const PARTS = [
   ['alcohol', 'Alcohol', '🍷'],
   ['postre', 'Dulce', '🍰'],   // key stays 'postre' so saved data keeps working
 ];
+// "¿Valió la pena?": three faces stored on the Excel's 1-5 enjoyment scale (0 = not rated)
+const JOY = [[1, '😐', 'No tanto'], [3, '🙂', 'Estuvo bien'], [5, '😍', 'Valió la pena']];
+const joyOf = (v) => (v ? JOY.reduce((a, b) => (Math.abs(b[0] - v) < Math.abs(a[0] - v) ? b : a)) : null);
 // Start time of each auto-detected meal; before breakfast counts as dinner (late night).
 const DEFAULT_RANGES = { Desayuno: '05:00', Almuerzo: '11:00', Merienda: '15:30', Cena: '19:00' };
 // Excel column headers <-> entry fields
@@ -293,6 +296,7 @@ function tap(part) {
   const whole = part === 'completa';
   const noun = { comida: 'Comida fuera del plan', alcohol: 'Alcohol', postre: 'Dulce', completa: 'Comida libre completa' }[part];
   const where = `${withArticle(momento)} ${dayLabel(fecha)}`;
+  const fem = whole || part === 'comida'; // "comida … sumada", "alcohol … sumado"
   const occ = occasion(fecha, momento, whole);
   const before = snapshot();
   const undo = () => {
@@ -308,13 +312,14 @@ function tap(part) {
     if (empty) state.entries = state.entries.filter((e) => e !== occ);
     persist();
     render();
-    toast((whole ? `${noun} sacada de ${where}` : empty ? `Registro de ${where} borrado` : `${noun} sacado de ${where}`).replace(' de el ', ' del '), undo);
+    toast((empty && !whole ? `Registro de ${where} borrado` : `${noun} ${fem ? 'sacada' : 'sacado'} de ${where}`).replace(' de el ', ' del '), undo);
     return;
   }
+  let target = occ;
   if (occ) {
     occ.partes[part] = true;
   } else {
-    state.entries.push({
+    target = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       fecha,
       hora: currentTime(momento),
@@ -325,14 +330,15 @@ function tap(part) {
       lugar: '',
       disfrute: 0,
       notas: '',
-    });
+    };
+    state.entries.push(target);
   }
   persist();
   const added = whole ? 3 : 1;
   freshWedges = added;
   hurt(added, document.querySelector(`.key[data-part="${part}"]`), whole);
   if (weekOffsetOf(fecha) !== weekOffset) goWeek(weekOffsetOf(fecha)); else render();
-  toast(`${noun} ${whole ? 'sumada' : 'sumado'} a ${where}`.replace(' a el ', ' al '), undo);
+  toast(`${noun} ${fem ? 'sumada' : 'sumado'} a ${where}`.replace(' a el ', ' al '), undo, target.id);
 }
 
 // a haptic tick: Android has vibrate(); iOS Safari (18+) has no API, but toggling a native
@@ -615,6 +621,8 @@ function entryRow(e, title) {
   const val = document.createElement('span');
   val.className = 'val';
   val.textContent = fmtThirds(thirdsOf(e));
+  const j = joyOf(e.disfrute);
+  if (j) val.prepend(Object.assign(document.createElement('span'), { className: 'joy', textContent: j[1], title: j[2] }));
   b.append(dots, what, val);
   b.setAttribute('aria-label', `${title}: ${parts}. Editar`);
   li.appendChild(b);
@@ -1308,8 +1316,23 @@ function openEdit(id) {
   $('eMeal').innerHTML = MEALS.map((m) => `<option${m === e.momento ? ' selected' : ''}>${m}</option>`).join('');
   $('eDesc').value = e.descripcion || '';
   $('eNotes').value = [e.lugar, e.notas].filter(Boolean).join(' — ');
+  editJoy = joyOf(e.disfrute)?.[0] || 0;
+  renderEditJoy();
   renderEditParts();
   openSheet('editSheet');
+}
+
+let editJoy = 0;
+function renderEditJoy() {
+  const box = $('eJoy');
+  box.innerHTML = '';
+  for (const [v, face, label] of JOY) {
+    const b = Object.assign(document.createElement('button'), { type: 'button' });
+    b.append(Object.assign(document.createElement('span'), { className: 'face', textContent: face, ariaHidden: 'true' }), label);
+    b.setAttribute('aria-pressed', String(editJoy === v));
+    b.onclick = () => { editJoy = editJoy === v ? 0 : v; renderEditJoy(); }; // tap again to clear
+    box.append(b);
+  }
 }
 
 $('editForm').addEventListener('submit', (ev) => {
@@ -1326,6 +1349,7 @@ $('editForm').addEventListener('submit', (ev) => {
     descripcion: $('eDesc').value.trim(),
     lugar: '',
     notas: $('eNotes').value.trim(),
+    disfrute: editJoy,
   });
   persist();
   closeSheet('editSheet');
@@ -2305,13 +2329,32 @@ function ask(message, actions) {
 
 let toastTimer;
 let toastUndo = null;
-function toast(msg, undo) {
+function toast(msg, undo, rateId) {
   $('toastMsg').textContent = msg;
   toastUndo = undo || null;
   $('toastUndo').hidden = !undo;
+  const e = rateId && state.entries.find((x) => x.id === rateId);
+  const joy = $('toastJoy');
+  joy.hidden = !e;
+  if (e) {
+    const box = joy.querySelector('.faces');
+    box.innerHTML = '';
+    for (const [v, face, label] of JOY) {
+      const b = Object.assign(document.createElement('button'), { type: 'button', textContent: face });
+      b.setAttribute('aria-label', label);
+      b.setAttribute('aria-pressed', String(joyOf(e.disfrute)?.[0] === v));
+      b.onclick = () => {
+        e.disfrute = v;
+        persist();
+        render();
+        toast(`Anotado: ${label.toLowerCase()} ${face}`);
+      };
+      box.append(b);
+    }
+  }
   $('toast').classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { $('toast').classList.remove('show'); toastUndo = null; }, undo ? 5000 : 2600);
+  toastTimer = setTimeout(() => { $('toast').classList.remove('show'); toastUndo = null; }, e ? 7000 : undo ? 5000 : 2600);
 }
 $('toastUndo').onclick = () => { const fn = toastUndo; toastUndo = null; if (fn) fn(); };
 

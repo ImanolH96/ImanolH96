@@ -339,6 +339,20 @@
   .toast:not(.show) { visibility: hidden; transition: transform .25s, visibility 0s .25s; }
   .toast.show { transform: translateY(0); }
   .toast button { border: 0; background: var(--ink); color: var(--paper); border-radius: 10px; padding: 8px 12px; font-weight: 700; flex: none; }
+  .toast { flex-wrap: wrap; }
+  #toastMsg { flex: 1 1 0; min-width: 0; }
+  .toast-joy { flex-basis: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--ink) 15%, transparent); font-size: 14px; }
+  .toast-joy .faces { display: flex; gap: 6px; }
+  .toast .toast-joy button, .joy-pick .face, .entry .val .joy { font-family: 'Apple Color Emoji', 'Noto Color Emoji', 'Segoe UI Emoji', sans-serif; }
+  .toast .toast-joy button { background: color-mix(in srgb, var(--ink) 8%, transparent); font-size: 22px; line-height: 1; padding: 6px 10px; }
+  .toast .toast-joy button[aria-pressed="true"] { background: var(--completa); }
+  .joy-pick { display: flex; gap: 6px; }
+  .joy-pick button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px;
+    border: 1.5px solid var(--line); border-radius: 14px; background: transparent; color: var(--paper); font-size: 13px; font-weight: 600; }
+  .joy-pick .face { font-size: 24px; line-height: 1.1; }
+  .joy-pick button[aria-pressed="true"] { border-color: var(--completa); background: color-mix(in srgb, var(--completa) 22%, transparent); }
+  .entry .val .joy { font-size: 16px; margin-right: 6px; vertical-align: 1px; }
 
   /* ---------- bottom sheets ---------- */
   .scrim {
@@ -748,6 +762,7 @@
     <label class="field"><span>Momento</span>
       <select id="eMeal"></select>
     </label>
+    <div class="field"><span>¿Valió la pena? (opcional)</span><div class="joy-pick" id="eJoy"></div></div>
     <label class="field"><span>Qué fue (opcional)</span><input id="eDesc" placeholder="Pizza con amigos"></label>
     <label class="field"><span>Notas (opcional)</span><textarea id="eNotes" placeholder="Dónde, con quién, cómo te sentiste"></textarea></label>
     <div class="actions">
@@ -835,7 +850,7 @@
   </div>
 </div>
 
-<div class="toast" id="toast" role="status"><span id="toastMsg"></span><button type="button" id="toastUndo">Deshacer</button></div>
+<div class="toast" id="toast" role="status"><span id="toastMsg"></span><button type="button" id="toastUndo">Deshacer</button><div class="toast-joy" id="toastJoy" hidden><span>¿Valió la pena?</span><span class="faces"></span></div></div>
 
 <script src="vendor/xlsx.mini.min.js"></script>
 <script src="app.js"></script>
