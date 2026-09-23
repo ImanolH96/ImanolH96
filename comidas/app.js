@@ -1,6 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
+const APP_VERSION = '31';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -1133,6 +1134,7 @@ $('eDelete').onclick = async () => {
 // ---------- settings ----------
 
 $('btnSettings').onclick = () => {
+  $('appVersion').textContent = `Versión ${APP_VERSION}`;
   $('sQuota').value = state.settings.quota;
   $('sWeekStart').value = String(state.settings.weekStart);
   for (const m of Object.keys(DEFAULT_RANGES)) $(`sRange${m}`).value = state.settings.ranges[m];
@@ -1332,17 +1334,20 @@ $('fileInput').onchange = async (ev) => {
 function hurt(thirds, from, heavy = thirds >= 3) {
   if (!thirds) return;
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  // Web Animations restart reliably on every tap (class toggling doesn't on iOS Safari)
-  const fx = $('hurt');
-  fx.classList.toggle('big', heavy);
-  fx.getAnimations().forEach((a) => a.cancel());
-  fx.animate(heavy
+  // a fresh overlay per hit, removed when done: nothing to "restart", so it fires every time
+  const fx = Object.assign(document.createElement('div'), { className: 'hurt' + (heavy ? ' big' : '') });
+  fx.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(fx);
+  const dur = still ? 400 : heavy ? 1100 : 700;
+  const flash = fx.animate(heavy
     ? [{ opacity: 0 }, { opacity: 1, offset: 0.08 }, { opacity: 0.5, offset: 0.3 }, { opacity: 1, offset: 0.42 }, { opacity: 0 }]
     : [{ opacity: 0 }, { opacity: 1, offset: 0.12 }, { opacity: 0 }],
-  { duration: still ? 400 : heavy ? 1100 : 700, easing: 'ease-out' });
+  { duration: dur, easing: 'ease-out', fill: 'forwards' });
+  flash.onfinish = () => fx.remove();
+  setTimeout(() => fx.remove(), dur + 200); // in case onfinish never fires
+
   if (!still) {
     const main = document.querySelector('main');
-    main.getAnimations().forEach((a) => a.cancel());
     const d = heavy ? 9 : 5;
     main.animate([
       { transform: 'none' }, { transform: `translateX(${-d}px)` }, { transform: `translateX(${d}px)` },
@@ -1355,7 +1360,12 @@ function hurt(thirds, from, heavy = thirds >= 3) {
     f.style.left = `${r.left + r.width / 2}px`;
     f.style.top = `${r.top + r.height * 0.4}px`;
     document.body.appendChild(f);
-    setTimeout(() => f.remove(), 1100);
+    f.animate([
+      { opacity: 0, transform: 'translate(-50%, -30%) scale(.6)' },
+      { opacity: 1, transform: 'translate(-50%, -60%) scale(1.15)', offset: 0.15 },
+      { opacity: 0, transform: 'translate(-50%, -190%) scale(1)' },
+    ], { duration: 1050, easing: 'ease-out', fill: 'forwards' });
+    setTimeout(() => f.remove(), 1150);
   }
   if (navigator.vibrate) navigator.vibrate(heavy ? [40, 60, 80] : 35);
 }

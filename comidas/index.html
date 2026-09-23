@@ -352,23 +352,18 @@
   .parts .wide[aria-pressed="true"] { border-color: var(--completa); }
 
   /* ---------- damage feedback ---------- */
+  .version { text-align: center; font-size: 12px; opacity: .6; }
   .hurt {
     position: fixed; inset: 0; z-index: 40; pointer-events: none; opacity: 0;
-    background: radial-gradient(ellipse at center, transparent 35%, rgb(200 0 20 / .55) 75%, rgb(140 0 10 / .85) 100%);
+    background: radial-gradient(ellipse at center, rgb(200 0 20 / .12) 25%, rgb(210 0 20 / .65) 70%, rgb(150 0 10 / .92) 100%);
   }
   .hurt.big { background: radial-gradient(ellipse at center, rgb(160 0 10 / .25) 20%, rgb(200 0 20 / .7) 65%, rgb(120 0 10 / .95) 100%); }
   .dmg {
     position: fixed; z-index: 41; pointer-events: none; transform: translate(-50%, -50%);
     font-size: 26px; font-weight: 800; color: #ff3b3b; white-space: nowrap;
     text-shadow: 0 2px 0 #5a0008, 0 0 18px rgb(255 0 0 / .6);
-    animation: dmg 1.05s ease-out forwards;
   }
   .dmg.big { font-size: 38px; }
-  @keyframes dmg {
-    0% { opacity: 0; transform: translate(-50%, -30%) scale(.6); }
-    15% { opacity: 1; transform: translate(-50%, -60%) scale(1.15); }
-    100% { opacity: 0; transform: translate(-50%, -190%) scale(1); }
-  }
   .actions { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
   .solid {
     border: 0; border-radius: 14px; padding: 14px; font-size: 17px; font-weight: 700;
@@ -530,6 +525,7 @@
       <button class="link danger" type="button" id="btnWipe">Borrar todos los registros</button>
       <button class="link" type="button" data-close>Cerrar</button>
     </div>
+    <p class="version" id="appVersion"></p>
   </div>
 </div>
 
@@ -541,7 +537,6 @@
   </div>
 </div>
 
-<div class="hurt" id="hurt" aria-hidden="true"></div>
 <div class="toast" id="toast" role="status"><span id="toastMsg"></span><button type="button" id="toastUndo">Deshacer</button></div>
 
 <script src="vendor/xlsx.mini.min.js"></script>
