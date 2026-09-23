@@ -64,20 +64,21 @@
   .today-sum .head .status { font-size: 13px; padding-block: 3px; }
   .today-sum .head .status i { width: 20px; height: 20px; }
   /* the headline is what's left; the plates show it in the dial's own units (1 plate = 1 free meal, cut in thirds) */
-  .today-sum .hero { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-  .today-sum .hero-text { display: flex; flex-direction: column; min-width: 0; }
-  .today-sum .cap { font-size: 14px; font-weight: 600; color: var(--paper); }
-  .today-sum .num { font-size: 40px; line-height: 1; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin: 1px 0 3px; }
-  .today-sum.s-over .num { color: var(--over); }
-  .today-sum .sub { font-size: 13px; color: var(--muted); }
-  .today-sum .plates { flex: none; height: 46px; width: auto; max-width: 62%; overflow: visible; }
+  .hero { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .hero-text { display: flex; flex-direction: column; min-width: 0; }
+  .hero .cap { font-size: 14px; font-weight: 600; color: var(--paper); }
+  .hero .num { font-size: 40px; line-height: 1; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin: 1px 0 3px; }
+  .hero.over .num { color: var(--over); }
+  .hero .sub { font-size: 13px; color: var(--muted); }
+  .week-card { margin-top: 12px; background: var(--panel); border-radius: 16px; padding: 12px 14px 14px; }
+  .plates .w.fresh { animation: stamp .45s cubic-bezier(.2, 1.6, .4, 1); }
+  .hero .plates { flex: none; height: 46px; width: auto; max-width: 62%; overflow: visible; }
   .plates .w { stroke: var(--panel); stroke-width: 2.5; stroke-linejoin: round; }
   .plates .w-empty { fill: var(--ink); }
   .plates .w-comida { fill: var(--comida); }
   .plates .w-alcohol { fill: var(--alcohol); }
   .plates .w-postre { fill: var(--postre); }
   .plates .w-completa { fill: var(--completa); }
-  .plates .w-reserved { fill: url(#hatch); }
   .plates .h-bg { fill: var(--ink); } .plates .h-ln { fill: var(--completa); }
   .plates .extra .w-empty { fill: transparent; }
   .plates .ring { fill: none; stroke: var(--over); stroke-width: 2.5; stroke-dasharray: 4 3; }
@@ -110,16 +111,9 @@
   }
   .hidden, [hidden] { display: none !important; }
 
-  /* ---------- top: week punch card ---------- */
+  /* ---------- top: week card ---------- */
   .top { display: flex; flex-direction: column; }
   .week-title { margin: 0; font-size: 15px; font-weight: 500; color: var(--muted); }
-  .week-left {
-    margin: 2px 0 0; font-size: 44px; line-height: 1; font-weight: 800;
-    font-variant-numeric: tabular-nums; letter-spacing: -0.02em; text-wrap: balance;
-  }
-  .week-left small { display: block; font-size: 17px; font-weight: 500; letter-spacing: 0; margin-top: 6px; }
-  .week-left .extra { color: var(--over); font-size: .62em; margin-left: 4px; }
-  .week-left.s-clean, .week-left.s-good { color: var(--good); }
   .week-status { margin-top: 10px; }
   .status {
     --st: var(--good);
@@ -134,15 +128,8 @@
   .s-clean, .s-good { --st: var(--good); }
   .s-limit { --st: var(--paper); }
   .s-over { --st: var(--over); }
-  .punch.s-clean .slot, .punch.s-good .slot { stroke: color-mix(in srgb, var(--good) 60%, var(--line)); }
   .gear { background: none; border: 0; padding: 8px; margin: -4px -8px 0 0; color: var(--muted); }
   .gear svg { display: block; width: 26px; height: 26px; }
-  .punch { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
-  .punch svg { width: 48px; height: 48px; display: block; }
-  .punch .slot { fill: none; stroke: var(--line); stroke-width: 2; }
-  .punch .slot.extra { stroke: var(--over); stroke-dasharray: 4 3; }
-  .punch .divider { stroke: var(--ink); stroke-width: 2.5; }
-  .punch .wedge.fresh { animation: stamp .45s cubic-bezier(.2, 1.6, .4, 1); transform-origin: 24px 24px; }
   @keyframes stamp { from { transform: scale(.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
   /* ---------- context: when ---------- */
@@ -670,9 +657,8 @@
         <p class="week-title" id="weekTitle">Esta semana</p>
         <button class="nav" id="wkNext" type="button" aria-label="Semana siguiente"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
       </div>
-      <p class="week-left" id="weekLeft">2<small>comidas libres disponibles</small></p>
       <div class="week-status" id="weekStatus"></div>
-      <div class="punch" id="punch" aria-hidden="true"></div>
+      <div class="week-card" id="weekLeft"></div>
       <button class="today-link" id="wkToday" type="button" hidden>Volver a esta semana</button>
     </section>
     <section class="log">

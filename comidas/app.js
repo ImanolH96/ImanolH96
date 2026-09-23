@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '56';
+const APP_VERSION = '57';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -66,7 +66,7 @@ let editParts = {};
 let editCompleta = false;
 let weekOffset = 0;       // 0 = this week, 1 = last week, ...
 let monthRef = null; // key of the month/cycle shown in Mes (set on first render)
-let freshWedges = 0;      // wedges to animate on next punch render
+let freshWedges = 0;      // thirds to stamp on the next week-card render
 
 // Ask iOS not to evict our storage (best effort).
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
@@ -399,20 +399,14 @@ for (const key of $('pad').querySelectorAll('.key')) {
   });
 }
 
-// ---------- week punch card ----------
+// ---------- week card ----------
 
 const PART_COLOR = { comida: 'var(--comida)', alcohol: 'var(--alcohol)', postre: 'var(--postre)', completa: 'var(--completa)' };
 // chart series: the three parts plus the extra thirds a "completa" entry adds
 const SERIES = [...PARTS, ['completa', 'Completa', '🍽️']];
 
-function wedgePath(i) {
-  // third i of a circle centred at 24,24 with r=20, starting at 12 o'clock
-  const r = 20, c = 24;
-  const a0 = (-90 + i * 120) * Math.PI / 180;
-  const a1 = (-90 + (i + 1) * 120) * Math.PI / 180;
-  const p = (a) => `${(c + r * Math.cos(a)).toFixed(2)} ${(c + r * Math.sin(a)).toFixed(2)}`;
-  return `M${c} ${c} L${p(a0)} A${r} ${r} 0 0 1 ${p(a1)} Z`;
-}
+// third i of a 48×48 token (centre 24,24, r 20), starting at 12 o'clock
+const wedgePath = (i) => plateWedge(24, 24, 20, i);
 
 const DAY_MS = 864e5;
 const MONTH = (d) => d.toLocaleDateString('es', { month: 'long' });
@@ -549,18 +543,9 @@ function statusPill(st) {
 
 function renderWeek() {
   const [from, to] = viewedWeek();
-  const week = state.entries
-    .filter((e) => e.fecha >= from && e.fecha <= to)
-    .sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
-  const wedges = [];
-  for (const e of week) {
-    for (const [k] of PARTS) if (e.partes[k]) wedges.push(k);
-    if (e.completa) for (let i = partsOf(e); i < 3; i++) wedges.push('completa');
-  }
-  const used = wedges.length;
+  const slices = weekSlices(from, to);
+  const used = slices.length;
   const quota = (Number(state.settings.quota) || 0) * 3;
-  const left = quota - used;
-
   const current = weekOffset === 0;
   const range = weekRangeLabel(from, to, true);
   $('weekTitle').textContent = current ? `Esta semana, ${range}`
@@ -569,57 +554,15 @@ function renderWeek() {
   $('wkNext').disabled = current;
   $('wkToday').hidden = current;
   const st = weekStatus(used, quota, !current);
-  const big = $('weekLeft');
-  big.className = `week-left s-${st.key}`;
-  big.innerHTML = '';
   $('weekStatus').innerHTML = '';
   $('weekStatus').appendChild(statusPill(st));
-  $('punch').className = `punch s-${st.key}`;
-  const extra = () => Object.assign(document.createElement('span'), { className: 'extra', textContent: `+${fmtThirds(used - quota)}` });
-  if (left < 0) {
-    big.append(fmtThirds(quota), extra(), Object.assign(document.createElement('small'), {
-      textContent: `${mealsWord(quota / 3)} de cupo + ${fmtThirds(used - quota)} extra`,
-    }));
-  } else if (!current) {
-    big.append(fmtThirds(used), Object.assign(document.createElement('small'), {
-      textContent: left < 0 ? `de ${mealsWord(quota / 3)} de la semana` : `de ${mealsWord(quota / 3)} usadas`,
-    }));
-  } else if (left >= 0) {
-    big.append(fmtThirds(left), Object.assign(document.createElement('small'), {
-      textContent: left === 3 ? 'comida libre disponible' : left > 0 && left < 3 ? 'de comida libre disponible' : 'comidas libres disponibles',
-    }));
-  }
-
-  const circles = Math.max(quota / 3, Math.ceil(used / 3), 1);
-  const ns = 'http://www.w3.org/2000/svg';
-  const punch = $('punch');
-  punch.innerHTML = '';
-  for (let c = 0; c < circles; c++) {
-    const svg = document.createElementNS(ns, 'svg');
-    svg.setAttribute('viewBox', '0 0 48 48');
-    const slot = document.createElementNS(ns, 'circle');
-    slot.setAttribute('cx', 24); slot.setAttribute('cy', 24); slot.setAttribute('r', 21);
-    slot.setAttribute('class', 'slot' + (c >= quota / 3 ? ' extra' : ''));
-    svg.appendChild(slot);
-    for (let i = 0; i < 3; i++) {
-      const idx = c * 3 + i;
-      if (idx >= used) break;
-      const w = document.createElementNS(ns, 'path');
-      w.setAttribute('d', wedgePath(i));
-      w.setAttribute('fill', PART_COLOR[wedges[idx]]);
-      w.setAttribute('class', 'wedge' + (idx >= used - freshWedges ? ' fresh' : ''));
-      svg.appendChild(w);
-    }
-    for (let i = 0; i < 3; i++) {
-      const a = (-90 + i * 120) * Math.PI / 180;
-      const l = document.createElementNS(ns, 'line');
-      l.setAttribute('x1', 24); l.setAttribute('y1', 24);
-      l.setAttribute('x2', (24 + 21 * Math.cos(a)).toFixed(2)); l.setAttribute('y2', (24 + 21 * Math.sin(a)).toFixed(2));
-      l.setAttribute('class', 'divider');
-      svg.appendChild(l);
-    }
-    punch.appendChild(svg);
-  }
+  const daysLeft = Math.round((parseDate(to) - parseDate(isoDate(new Date()))) / 864e5) + 1;
+  const box = $('weekLeft');
+  box.className = `week-card s-${st.key}`;
+  box.innerHTML = '';
+  // the thirds just added get a little stamp when you land here from the keypad
+  const fresh = freshWedges ? [used - freshWedges, used] : 0;
+  box.append(weekHero({ used, quota, slices, current, daysLeft, fresh }));
   freshWedges = 0;
 }
 
@@ -684,30 +627,38 @@ function entryRow(e, title) {
 // Used thirds are painted in the part's color (in the order they were logged), events already
 // reserved are hatched, and anything above the quota spills onto extra plates ringed in red.
 const SVGNS = 'http://www.w3.org/2000/svg';
-function wedgePath(cx, cy, r, i) {
+function plateWedge(cx, cy, r, i) {
   const a0 = (-90 + i * 120) * Math.PI / 180, a1 = (-90 + (i + 1) * 120) * Math.PI / 180;
   const p = (a) => `${(cx + r * Math.cos(a)).toFixed(2)} ${(cy + r * Math.sin(a)).toFixed(2)}`;
   return `M${cx} ${cy} L${p(a0)} A${r} ${r} 0 0 1 ${p(a1)} Z`;
 }
-function weekPlates(slices, quota) {
+let platesSeq = 0;
+function weekPlates(slices, quota, fresh = 0) {
+  const hatch = `hatch${++platesSeq}`;
   const plates = Math.max(quota / 3, Math.ceil(slices.length / 3));
   const size = 44, gap = 10, pad = 3;
   const svg = document.createElementNS(SVGNS, 'svg');
   svg.setAttribute('class', 'plates');
   svg.setAttribute('viewBox', `0 0 ${plates * size + (plates - 1) * gap + pad * 2} ${size + pad * 2}`);
   svg.setAttribute('aria-hidden', 'true');
-  svg.innerHTML = '<defs><pattern id="hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
-    + '<rect width="5" height="5" class="h-bg"/><rect width="2" height="5" class="h-ln"/></pattern></defs>';
+  svg.innerHTML = `<defs><pattern id="${hatch}" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
+    + '<rect width="5" height="5" class="h-bg"/><rect width="2" height="5" class="h-ln"/></pattern></defs>`;
   for (let k = 0; k < plates; k++) {
     const cx = pad + k * (size + gap) + size / 2, cy = pad + size / 2;
     const extra = k * 3 >= quota;
     const g = document.createElementNS(SVGNS, 'g');
     g.setAttribute('class', extra ? 'plate extra' : 'plate');
     for (let i = 0; i < 3; i++) {
-      const kind = slices[k * 3 + i] || 'empty';
+      const idx = k * 3 + i;
+      const kind = slices[idx] || 'empty';
       const w = document.createElementNS(SVGNS, 'path');
-      w.setAttribute('d', wedgePath(cx, cy, size / 2, i));
+      w.setAttribute('d', plateWedge(cx, cy, size / 2, i));
       w.setAttribute('class', `w w-${kind}`);
+      if (kind === 'reserved') w.setAttribute('fill', `url(#${hatch})`);
+      if (fresh && kind !== 'empty' && kind !== 'reserved' && idx >= fresh[0] && idx < fresh[1]) {
+        w.classList.add('fresh');
+        w.style.transformOrigin = `${cx}px ${cy}px`;
+      }
       g.append(w);
     }
     if (extra) {
@@ -720,16 +671,49 @@ function weekPlates(slices, quota) {
   return svg;
 }
 
+// the week's thirds in the order they were logged, each tagged with its part
+function weekSlices(from, to) {
+  const out = [];
+  const week = state.entries.filter((e) => e.fecha >= from && e.fecha <= to)
+    .sort((x, y) => (x.fecha + x.hora).localeCompare(y.fecha + y.hora));
+  for (const e of week) {
+    if (e.completa) out.push('completa', 'completa', 'completa');
+    else for (const [k] of PARTS) if (e.partes[k]) out.push(k);
+  }
+  return out;
+}
+
+// Headline + plates for a week, shared by Registrar and Semana. The current week leads with what's
+// left; a finished week with what was used; over the quota, with how far above it.
+function weekHero({ used, quota, slices, current, daysLeft, fresh }) {
+  const left = quota - used;
+  let cap, num, sub;
+  if (left < 0) {
+    cap = 'Te pasaste'; num = `+${fmtThirds(-left)}`; sub = `sobre tu cupo de ${quota / 3}`;
+  } else if (current) {
+    const days = daysLeft === 1 ? 'último día' : `quedan ${daysLeft} días`;
+    cap = left === 1 || left === 3 ? 'Te queda' : 'Te quedan';
+    num = fmtThirds(left);
+    sub = left === 0 ? `Cupo completo · ${days}` : `de ${mealsWord(quota / 3)} · ${days}`;
+  } else {
+    cap = 'Usaste'; num = fmtThirds(used); sub = `de ${mealsWord(quota / 3)}`;
+  }
+  const hero = document.createElement('span');
+  hero.className = 'hero' + (left < 0 ? ' over' : '');
+  const text = document.createElement('span');
+  text.className = 'hero-text';
+  text.append(Object.assign(document.createElement('span'), { className: 'cap', textContent: cap }),
+    Object.assign(document.createElement('b'), { className: 'num', textContent: num }),
+    Object.assign(document.createElement('small'), { className: 'sub', textContent: sub }));
+  hero.append(text, weekPlates(slices, quota, fresh));
+  hero.dataset.said = `${cap.toLowerCase()} ${num.replace('+', '')} ${sub}`;
+  return hero;
+}
+
 function renderToday() {
   const [from, to] = weekBounds();
   const todayIso = isoDate(new Date());
-  const week = state.entries.filter((e) => e.fecha >= from && e.fecha <= to)
-    .sort((x, y) => (x.fecha + x.hora).localeCompare(y.fecha + y.hora));
-  const slices = [];
-  for (const e of week) {
-    if (e.completa) slices.push('completa', 'completa', 'completa');
-    else for (const [k] of PARTS) if (e.partes[k]) slices.push(k);
-  }
+  const slices = weekSlices(from, to);
   const used = slices.length;
   const quota = (Number(state.settings.quota) || 0) * 3;
   const left = quota - used;
@@ -744,21 +728,7 @@ function renderToday() {
   const head = document.createElement('span');
   head.className = 'head';
   head.append(Object.assign(document.createElement('small'), { textContent: 'Esta semana' }), statusPill(st));
-
-  // the headline is what you can still use; over the quota, how far above it you are
-  const num = left < 0 ? `+${fmtThirds(-left)}` : fmtThirds(left);
-  const one = left === 1 || left === 3;
-  const cap = left < 0 ? 'Te pasaste' : one ? 'Te queda' : 'Te quedan';
-  const days = daysLeft === 1 ? 'último día' : `quedan ${daysLeft} días`;
-  const sub = left < 0 ? `sobre tu cupo de ${quota / 3}` : left === 0 ? `Cupo completo · ${days}` : `de ${mealsWord(quota / 3)} · ${days}`;
-  const hero = document.createElement('span');
-  hero.className = 'hero';
-  const text = document.createElement('span');
-  text.className = 'hero-text';
-  text.append(Object.assign(document.createElement('span'), { className: 'cap', textContent: cap }),
-    Object.assign(document.createElement('b'), { className: 'num', textContent: num }),
-    Object.assign(document.createElement('small'), { className: 'sub', textContent: sub }));
-  hero.append(text, weekPlates(slices, quota));
+  const hero = weekHero({ used, quota, slices, current: true, daysLeft });
 
   const notes = [];
   if (reserved) notes.push(`${fmtThirds(reserved)} reservado para eventos`);
@@ -771,7 +741,7 @@ function renderToday() {
     note.append(notes.join(' · ').replace(/^./, (c) => c.toUpperCase()));
     box.append(note);
   }
-  const said = left < 0 ? `te pasaste ${fmtThirds(-left)} del cupo de ${mealsWord(quota / 3)}` : `${cap.toLowerCase()} ${fmtThirds(left)} de ${mealsWord(quota / 3)}, ${days}`;
+  const said = hero.dataset.said;
   box.setAttribute('aria-label', `Esta semana: ${said}, usaste ${fmtThirds(used)}. ${notes.join('. ')} ${st.label}. Ver semana`);
 
   renderTodayPlans();
