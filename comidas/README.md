@@ -29,6 +29,8 @@ Cuatro pestañas abajo: **Registrar** (abre siempre en el día de hoy; se puede 
   Debajo: total de comidas libres, cuántas veces hubo comida, alcohol y dulce, y una barra por semana (tocándola vas a esa semana). El Excel suma la hoja `Resumen mensual`.
 - Detalle opcional: tocando un registro se puede agregar qué fue y notas, cambiar día/hora/partes o borrarlo.
 - **Exportar a Excel (.xlsx)** con dos hojas: `Comidas` (una columna Sí/No por parte y el valor, ej. 0.67) y `Resumen semanal`. En iPhone abre el menú Compartir → "Guardar en Archivos", WhatsApp, mail, etc.
+- **¿Valió la pena?**: al sumar algo, el aviso de abajo ofrece 😐 🙂 😍 (opcional; también desde el detalle del registro). Se guarda en la columna "Disfrute (1-5)" del Excel como 1, 3 o 5.
+- **Resumen para la consulta** (botón al pie de Mes): el ciclo o mes que estás viendo, con total contra el cupo, cada semana con sus platos, qué fue (comida, alcohol, dulce, completas), en qué momentos pasa más y cuánto valió la pena, más las que no valieron tanto. "Compartir" lo manda como texto (WhatsApp, mail, notas).
 - **Recordatorio de copia**: los datos solo viven en el iPhone, así que si pasan 4 semanas sin exportar (o desde el primer registro, si nunca exportaste) Registrar muestra un aviso con un botón "Exportar". La ✕ lo pospone una semana.
 - **Importar desde Excel**: lee la hoja `Comidas` (podés editarla en Numbers/Excel y volver a cargarla). Te deja reemplazar todo o combinar.
 

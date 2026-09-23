@@ -359,6 +359,28 @@
     position: fixed; inset: 0; z-index: 30; background: rgb(8 12 32 / .6);
     display: flex; align-items: flex-end; justify-content: center;
   }
+  /* ---------- summary for the consultation ---------- */
+  .sum-open { width: 100%; margin-top: 14px; }
+  .sum { display: flex; flex-direction: column; gap: 8px; margin-top: -6px; }
+  .sum h4 { margin: 10px 0 0; font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .sum-top { font-size: 17px; font-weight: 600; }
+  .sum-total { font-size: 40px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .sum-note { margin: 0; font-size: 14px; color: var(--muted); }
+  .sum-insight { margin: 0; font-size: 15px; font-weight: 600; }
+  .sum-weeks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .sum-weeks li { display: flex; align-items: center; gap: 10px; background: var(--ink); border-radius: 12px; padding: 8px 10px; }
+  .sum-weeks .st { width: 22px; height: 22px; border-radius: 50%; background: var(--st); color: var(--ink-deep); display: inline-grid; place-items: center;
+    font-style: normal; font-size: 12px; font-weight: 800; flex: none; }
+  .sum-range { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; }
+  .sum-weeks .plates { height: 24px; width: auto; flex: none; }
+  .sum-weeks .plates .w { stroke: var(--ink); }
+  .sum-weeks .plates .w-empty { fill: var(--panel); }
+  .sum-val { flex: none; min-width: 48px; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; font-size: 14px; }
+  .sum-kinds { display: flex; gap: 8px; flex-wrap: wrap; }
+  .sum-kind { flex: 1; min-width: 72px; display: flex; flex-direction: column; align-items: center; gap: 1px; background: var(--ink); border-radius: 12px; padding: 8px 6px; }
+  .sum-kind .ico { font-size: 22px; font-family: 'Apple Color Emoji', 'Noto Color Emoji', 'Segoe UI Emoji', sans-serif; }
+  .sum-kind b { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .sum-kind small { font-size: 12px; color: var(--muted); text-align: center; }
   .sheet {
     width: 100%; max-width: 480px; max-height: 88vh; overflow-y: auto;
     background: var(--panel); border-radius: 24px 24px 0 0;
@@ -701,6 +723,7 @@
       <table class="sr-only" id="chartTable"></table>
     </figure>
     <ul class="weeks" id="monthWeeks"></ul>
+    <button class="ghost sum-open" id="btnSummary" type="button">📋 Resumen para la consulta</button>
   </section>
   </div>
   <!-- ===== Planificar ===== -->
@@ -806,6 +829,17 @@
 </div>
 
 <!-- settings -->
+<div class="scrim" id="summarySheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="summaryTitle">
+    <h3 id="summaryTitle">Resumen</h3>
+    <div class="sum" id="summaryBody"></div>
+    <div class="actions">
+      <button class="solid" type="button" id="summaryShare">Compartir</button>
+      <button class="link" type="button" data-close>Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <div class="scrim" id="settingsSheet" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
     <h3 id="settingsTitle">Ajustes</h3>

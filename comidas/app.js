@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '58';
+const APP_VERSION = '59';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -767,6 +767,137 @@ function renderToday() {
   }
   for (const e of day) list.appendChild(entryRow(e, `${e.momento}, ${e.hora}`));
 }
+
+// ---------- summary for the nutritionist: one cycle (or month) at a glance, shareable as text ----------
+
+function periodSummary(y, m) {
+  const span = monthSpan(y, m);
+  const today = isoDate(new Date());
+  const quota = (Number(state.settings.quota) || 0) * 3;
+  const entries = state.entries.filter((e) => e.fecha >= span.from && e.fecha <= span.to);
+  const total = entries.reduce((n, e) => n + thirdsOf(e), 0);
+  const weeks = span.weeks.filter(([f]) => f <= today).map(([from, to]) => {
+    const used = thirdsBetween(from, to);
+    return { from, to, used, slices: weekSlices(from, to), done: to < today, st: weekStatus(used, quota, to < today) };
+  });
+  const count = (fn) => entries.filter(fn).length;
+  const kinds = [...PARTS.map(([k, label, icon]) => ({ icon, label, n: count((e) => e.partes[k]) })),
+    { icon: '🍽️', label: 'Completa', n: count((e) => e.completa) }].filter((k) => k.n);
+  const tally = (key) => {
+    const t = {};
+    for (const e of entries) { const k = key(e); t[k] = (t[k] || 0) + thirdsOf(e); }
+    return Object.entries(t).sort((a, b) => b[1] - a[1]);
+  };
+  const byMeal = tally((e) => e.momento);
+  const byDay = tally((e) => parseDate(e.fecha).toLocaleDateString('es', { weekday: 'long' }));
+  const joy = JOY.map(([v, face, label]) => ({ face, label, list: entries.filter((e) => joyOf(e.disfrute)?.[0] === v) }));
+  const inCourse = today >= span.from && today <= span.to;
+  return { span, quota, total, allowed: monthAllowance(y, m), weeks, kinds, byMeal, byDay, joy, inCourse, title: periodTitle(y, m) };
+}
+
+// "sobre todo en la cena (4 de 6)" — only when one meal or day clearly stands out
+function standout(list, total, fmt) {
+  if (!list.length || total < 3) return '';
+  const [name, n] = list[0];
+  if (list[1] && list[1][1] === n) return '';
+  return n / total >= 0.4 ? fmt(name, n) : '';
+}
+
+function summaryLines(S) {
+  const where = state.settings.cycleStart ? 'Ciclo' : 'Mes';
+  const inPlan = S.weeks.filter((w) => w.done && w.used <= S.quota).length;
+  const doneWeeks = S.weeks.filter((w) => w.done).length;
+  const meal = standout(S.byMeal, S.total, (k, n) => `sobre todo en ${withArticle(k)} (${fmtThirds(n)} de ${fmtThirds(S.total)})`);
+  const day = standout(S.byDay, S.total, (k) => `el día con más, ${k}`);
+  return {
+    head: `${where} ${S.title}`,
+    total: `${fmtThirds(S.total)} de ${fmtThirds(S.allowed)} comidas libres`,
+    course: S.inCourse ? `En curso: semana ${S.weeks.length} de ${S.span.weeks.length}` : doneWeeks ? `${inPlan} de ${doneWeeks} semanas dentro del cupo` : '',
+    when: [meal, day].filter(Boolean).join('; '),
+  };
+}
+
+function summaryText(S) {
+  const L = summaryLines(S);
+  const out = [`🍽️ Comidas libres · ${L.head}`, `Total: ${L.total}${L.course ? ` (${L.course.charAt(0).toLowerCase() + L.course.slice(1)})` : ''}`, '', 'Semanas:'];
+  for (const w of S.weeks) out.push(`${w.st.icon} ${weekRangeLabel(w.from, w.to, true)}: ${fmtThirds(w.used)} de ${S.quota / 3}`);
+  if (S.kinds.length) out.push('', `Qué fue: ${S.kinds.map((k) => `${k.icon} ${k.label.split(' ')[0].toLowerCase()} ${k.n}`).join(' · ')}`);
+  if (L.when) out.push(`Cuándo: ${L.when}`);
+  const rated = S.joy.filter((j) => j.list.length);
+  if (rated.length) {
+    out.push(`¿Valió la pena?: ${rated.map((j) => `${j.face} ${j.list.length}`).join(' · ')}`);
+    const meh = S.joy[0].list.map((e) => e.descripcion).filter(Boolean);
+    if (meh.length) out.push(`No valieron tanto: ${meh.join(', ')}`);
+  }
+  return out.join('\n');
+}
+
+let summaryRef = null;
+function openSummary() {
+  summaryRef = monthRef;
+  const S = periodSummary(monthRef.getFullYear(), monthRef.getMonth());
+  const L = summaryLines(S);
+  const el = (tag, cls, text) => Object.assign(document.createElement(tag), cls ? { className: cls } : {}, text != null ? { textContent: text } : {});
+  const box = $('summaryBody');
+  box.innerHTML = '';
+  $('summaryTitle').textContent = L.head;
+  const top = el('div', 'sum-top');
+  top.append(el('b', 'sum-total', fmtThirds(S.total)), el('span', '', ` de ${fmtThirds(S.allowed)} comidas libres`));
+  box.append(top);
+  if (L.course) box.append(el('p', 'sum-note', L.course));
+
+  box.append(el('h4', '', 'Semanas'));
+  const wl = el('ul', 'sum-weeks');
+  for (const w of S.weeks) {
+    const li = el('li', `s-${w.st.key}`);
+    li.append(el('i', 'st', w.st.icon), el('span', 'sum-range', weekRangeLabel(w.from, w.to, true)),
+      weekPlates(w.slices, S.quota), el('span', 'sum-val', `${fmtThirds(w.used)} / ${S.quota / 3}`));
+    wl.append(li);
+  }
+  box.append(wl);
+
+  if (S.kinds.length) {
+    box.append(el('h4', '', 'Qué fue'));
+    const kl = el('div', 'sum-kinds');
+    for (const k of S.kinds) {
+      const c = el('span', 'sum-kind');
+      c.append(el('span', 'ico', k.icon), el('b', '', k.n), el('small', '', k.label.split(' ')[0]));
+      c.setAttribute('aria-label', `${k.label}: ${k.n}`);
+      kl.append(c);
+    }
+    box.append(kl);
+  }
+  if (S.byMeal.length) {
+    box.append(el('h4', '', 'Cuándo'));
+    box.append(el('p', 'sum-note', S.byMeal.map(([k, n]) => `${k} ${fmtThirds(n)}`).join(' · ')));
+    if (L.when) box.append(el('p', 'sum-insight', L.when.charAt(0).toUpperCase() + L.when.slice(1)));
+  }
+  const rated = S.joy.filter((j) => j.list.length);
+  box.append(el('h4', '', '¿Valió la pena?'));
+  if (rated.length) {
+    const jl = el('div', 'sum-kinds');
+    for (const j of S.joy) {
+      const c = el('span', 'sum-kind');
+      c.append(el('span', 'ico', j.face), el('b', '', j.list.length), el('small', '', j.label));
+      jl.append(c);
+    }
+    box.append(jl);
+    const meh = S.joy[0].list.map((e) => e.descripcion).filter(Boolean);
+    if (meh.length) box.append(el('p', 'sum-insight', `No valieron tanto: ${meh.join(', ')}`));
+  } else {
+    box.append(el('p', 'sum-note', 'Todavía no calificaste ninguna. Podés hacerlo al sumar o desde el detalle de cada registro.'));
+  }
+  openSheet('summarySheet');
+}
+
+$('btnSummary').onclick = openSummary;
+$('summaryShare').onclick = async () => {
+  const text = summaryText(periodSummary(summaryRef.getFullYear(), summaryRef.getMonth()));
+  if (navigator.share) {
+    try { await navigator.share({ text }); return; } catch (err) { if (err.name === 'AbortError') return; }
+  }
+  try { await navigator.clipboard.writeText(text); toast('Resumen copiado'); } catch { toast('No se pudo compartir'); }
+};
 
 // ---------- tabs ----------
 
