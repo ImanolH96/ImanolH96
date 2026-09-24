@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '60';
+const APP_VERSION = '61';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -400,6 +400,11 @@ const sound = (() => {
     if (ctx.state === 'suspended') ctx.resume();
     return ctx;
   };
+  // decodeAudioData: callbacks for older Safari, a promise elsewhere (whose rejection must be caught too)
+  const decode = (c, bytes) => new Promise((ok, ko) => {
+    const p = c.decodeAudioData(bytes, ok, ko);
+    if (p && p.catch) p.catch(ko);
+  });
   const reverb = (c) => {
     if (room) return room;
     const len = Math.round(c.sampleRate * 1.6);
@@ -481,7 +486,7 @@ const sound = (() => {
   async function playClip(c, src) {
     if (clipSrc !== src) {
       const bytes = await (await fetch(src)).arrayBuffer();
-      clip = await new Promise((ok, ko) => c.decodeAudioData(bytes, ok, ko));
+      clip = await decode(c, bytes);
       clipSrc = src;
     }
     const b = c.createBufferSource();
@@ -491,6 +496,15 @@ const sound = (() => {
   }
   return {
     faaa, // (context, big): also renders offline
+    async canPlay(src) {
+      const c = audio();
+      if (!c) return false;
+      try {
+        const bytes = await (await fetch(src)).arrayBuffer();
+        await decode(c, bytes);
+        return true;
+      } catch (e) { return false; }
+    },
     // call from the tap itself: iOS only lets audio start inside a user gesture
     play(big = false) {
       if (state.settings.sound === false) return;
@@ -1636,9 +1650,12 @@ $('soundInput').onchange = () => {
   if (!f) return;
   if (f.size > 1024 * 1024) { toast('El audio tiene que pesar menos de 1 MB'); return; }
   const r = new FileReader();
-  r.onload = () => {
+  r.onload = async () => {
+    // no file-type filter on the picker (iOS greys out downloaded mp3s), so check it really plays
+    if (!(await sound.canPlay(r.result))) { toast('Ese archivo no es un audio que se pueda reproducir'); return; }
     try { localStorage.setItem(SOUND_KEY, r.result); } catch (e) { toast('No se pudo guardar el audio'); return; }
     renderSoundSettings();
+    sound.play();
     toast('Listo, ahora suena tu audio');
   };
   r.readAsDataURL(f);
