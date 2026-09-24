@@ -31,6 +31,7 @@ Cuatro pestañas abajo: **Registrar** (abre siempre en el día de hoy; se puede 
 - **Exportar a Excel (.xlsx)** con dos hojas: `Comidas` (una columna Sí/No por parte y el valor, ej. 0.67) y `Resumen semanal`. En iPhone abre el menú Compartir → "Guardar en Archivos", WhatsApp, mail, etc.
 - **¿Valió la pena?**: al sumar algo, el aviso de abajo ofrece 😐 🙂 😍 (opcional; también desde el detalle del registro). Se guarda en la columna "Disfrute (1-5)" del Excel como 1, 3 o 5.
 - **Resumen para la consulta** (botón al pie de Mes): el ciclo o mes que estás viendo, con total contra el cupo, cada semana con sus platos, qué fue (comida, alcohol, dulce, completas), en qué momentos pasa más y cuánto valió la pena, más las que no valieron tanto. "Compartir" lo manda como texto (WhatsApp, mail, notas).
+- **Sonido "Faaa"** al sumar (estilo videos de bromas): sintetizado en la app con Web Audio, sin archivos; más largo en la comida completa. En ⚙️ Ajustes se apaga, se prueba o se reemplaza por un audio tuyo (menos de 1 MB, queda guardado en el iPhone). Con el iPhone en silencio no suena.
 - **Recordatorio de copia**: los datos solo viven en el iPhone, así que si pasan 4 semanas sin exportar (o desde el primer registro, si nunca exportaste) Registrar muestra un aviso con un botón "Exportar". La ✕ lo pospone una semana.
 - **Importar desde Excel**: lee la hoja `Comidas` (podés editarla en Numbers/Excel y volver a cargarla). Te deja reemplazar todo o combinar.
 

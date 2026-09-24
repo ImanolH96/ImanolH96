@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '59';
+const APP_VERSION = '60';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -386,6 +386,124 @@ for (const key of $('pad').querySelectorAll('.key')) {
   stack(key.querySelector('.inset .blur'), 12, 0.05);  // inner shadow on a latched cap
 }
 
+// ---------- sound: a synthesized "FAAAH" (prank-video style) when something is added ----------
+// Built with Web Audio, no audio file: a breathy "F" (filtered noise), then a shouted "AAAH" (two
+// sawtooth voices through vowel formants, soft-clipped, pitch leaping up and sagging with vibrato),
+// all in a big room reverb. A custom clip picked in Ajustes replaces it. Muted by the silent switch.
+const SOUND_KEY = 'comidas-libres:sound';
+const sound = (() => {
+  let ctx = null, room = null, clip = null, clipSrc = null;
+  const audio = () => {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    if (!ctx) ctx = new AC();
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  };
+  const reverb = (c) => {
+    if (room) return room;
+    const len = Math.round(c.sampleRate * 1.6);
+    room = c.createBuffer(2, len, c.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = room.getChannelData(ch);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 3;
+    }
+    return room;
+  };
+  function faaa(c, big) {
+    const t = c.currentTime + 0.02;
+    const end = t + (big ? 1.75 : 1.2);
+    const out = c.createGain();
+    out.gain.value = big ? 0.9 : 0.75;
+    const wet = c.createGain();
+    wet.gain.value = 0.5;
+    const verb = c.createConvolver();
+    verb.buffer = reverb(c);
+    out.connect(c.destination);
+    out.connect(verb).connect(wet).connect(c.destination);
+
+    // "F": a short burst of bright noise
+    const nb = c.createBuffer(1, Math.round(c.sampleRate * 0.3), c.sampleRate);
+    const nd = nb.getChannelData(0);
+    for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+    const noise = c.createBufferSource();
+    noise.buffer = nb;
+    const hp = c.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 1800;
+    const ng = c.createGain();
+    ng.gain.setValueAtTime(0, t);
+    ng.gain.linearRampToValueAtTime(0.4, t + 0.04);
+    ng.gain.linearRampToValueAtTime(0, t + 0.17);
+    noise.connect(hp).connect(ng).connect(out);
+    noise.start(t); noise.stop(t + 0.3);
+
+    // "AAAH": shouted vowel
+    const v = t + 0.11;
+    const voice = c.createGain();
+    voice.gain.value = 0.5;
+    const lfo = c.createOscillator();
+    lfo.frequency.value = 5.5;
+    const vib = c.createGain();
+    vib.gain.setValueAtTime(0, v);
+    vib.gain.linearRampToValueAtTime(10, v + 0.5);
+    lfo.connect(vib);
+    const oscs = [-6, 6].map((detune) => {
+      const o = c.createOscillator();
+      o.type = 'sawtooth';
+      o.detune.value = detune;
+      o.frequency.setValueAtTime(220, v);
+      o.frequency.exponentialRampToValueAtTime(big ? 360 : 330, v + 0.16);
+      o.frequency.exponentialRampToValueAtTime(big ? 190 : 240, end);
+      vib.connect(o.frequency);
+      o.connect(voice);
+      return o;
+    });
+    const shout = c.createWaveShaper();
+    const curve = new Float32Array(1024);
+    for (let i = 0; i < curve.length; i++) curve[i] = Math.tanh(2.6 * (i / 511.5 - 1));
+    shout.curve = curve;
+    voice.connect(shout);
+    const env = c.createGain();
+    env.gain.setValueAtTime(0.0001, v);
+    env.gain.exponentialRampToValueAtTime(1, v + 0.07);
+    env.gain.setValueAtTime(1, end - 0.4);
+    env.gain.exponentialRampToValueAtTime(0.0001, end);
+    for (const [f, q, g] of [[820, 5, 1], [1220, 7, 0.55], [2650, 9, 0.28], [3500, 10, 0.12]]) {
+      const bp = c.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q;
+      const fg = c.createGain();
+      fg.gain.value = g;
+      shout.connect(bp).connect(fg).connect(env);
+    }
+    env.connect(out);
+    for (const o of [...oscs, lfo]) { o.start(v); o.stop(end + 0.05); }
+  }
+  async function playClip(c, src) {
+    if (clipSrc !== src) {
+      const bytes = await (await fetch(src)).arrayBuffer();
+      clip = await new Promise((ok, ko) => c.decodeAudioData(bytes, ok, ko));
+      clipSrc = src;
+    }
+    const b = c.createBufferSource();
+    b.buffer = clip;
+    b.connect(c.destination);
+    b.start();
+  }
+  return {
+    faaa, // (context, big): also renders offline
+    // call from the tap itself: iOS only lets audio start inside a user gesture
+    play(big = false) {
+      if (state.settings.sound === false) return;
+      const c = audio();
+      if (!c) return;
+      let custom = null;
+      try { custom = localStorage.getItem(SOUND_KEY); } catch (e) { /* storage blocked */ }
+      if (custom) playClip(c, custom).catch(() => faaa(c, big));
+      else faaa(c, big);
+    },
+  };
+})();
+
 // the dial's parts are SVG groups: press feedback by hand, keyboard like a button
 for (const key of $('pad').querySelectorAll('.key')) {
   const press = (on) => key.classList.toggle('pressed', on);
@@ -398,6 +516,7 @@ for (const key of $('pad').querySelectorAll('.key')) {
     key.classList.toggle('on');
     key.classList.remove('pressed');
     haptic();
+    if (key.classList.contains('on')) sound.play(key.dataset.part === 'completa');
     requestAnimationFrame(() => setTimeout(() => tap(key.dataset.part), 0));
   });
   key.addEventListener('keydown', (ev) => {
@@ -1499,7 +1618,39 @@ $('eDelete').onclick = async () => {
 
 // ---------- settings ----------
 
+function renderSoundSettings() {
+  let custom = null;
+  try { custom = localStorage.getItem(SOUND_KEY); } catch (e) { /* storage blocked */ }
+  $('sSound').checked = state.settings.sound !== false;
+  $('sSoundReset').hidden = !custom;
+  $('sSoundNote').textContent = custom
+    ? 'Suena tu audio. Con el iPhone en silencio no suena.'
+    : 'Suena el "Faaa" de la app (más largo en la comida completa). Con el iPhone en silencio no suena.';
+}
+$('sSound').onchange = () => { state.settings.sound = $('sSound').checked; persist(); renderSoundSettings(); };
+$('sSoundTest').onclick = () => { const was = state.settings.sound; state.settings.sound = true; sound.play(); state.settings.sound = was; };
+$('sSoundPick').onclick = () => $('soundInput').click();
+$('soundInput').onchange = () => {
+  const f = $('soundInput').files[0];
+  $('soundInput').value = '';
+  if (!f) return;
+  if (f.size > 1024 * 1024) { toast('El audio tiene que pesar menos de 1 MB'); return; }
+  const r = new FileReader();
+  r.onload = () => {
+    try { localStorage.setItem(SOUND_KEY, r.result); } catch (e) { toast('No se pudo guardar el audio'); return; }
+    renderSoundSettings();
+    toast('Listo, ahora suena tu audio');
+  };
+  r.readAsDataURL(f);
+};
+$('sSoundReset').onclick = () => {
+  try { localStorage.removeItem(SOUND_KEY); } catch (e) { /* storage blocked */ }
+  renderSoundSettings();
+  toast('Volviste al Faaa');
+};
+
 $('btnSettings').onclick = () => {
+  renderSoundSettings();
   $('appVersion').textContent = `Versión ${APP_VERSION}`;
   $('sQuota').value = state.settings.quota;
   $('sWeekStart').value = String(state.settings.weekStart);

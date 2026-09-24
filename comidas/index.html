@@ -359,6 +359,10 @@
     position: fixed; inset: 0; z-index: 30; background: rgb(8 12 32 / .6);
     display: flex; align-items: flex-end; justify-content: center;
   }
+  .sound-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .check { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+  .check input { width: 22px; height: 22px; accent-color: var(--completa); }
+  .sound-note { margin-top: -6px; font-size: 13px; }
   /* ---------- summary for the consultation ---------- */
   .sum-open { width: 100%; margin-top: 14px; }
   .sum { display: flex; flex-direction: column; gap: 8px; margin-top: -6px; }
@@ -862,6 +866,17 @@
     <div class="actions">
       <button class="solid" type="button" id="btnSaveSettings">Guardar ajustes</button>
     </div>
+    <p>Sonido al sumar</p>
+    <div class="sound-row">
+      <label class="check"><input type="checkbox" id="sSound"> Sonar "Faaa" al sumar</label>
+      <button class="ghost" id="sSoundTest" type="button">▶ Probar</button>
+    </div>
+    <div class="foot">
+      <button class="ghost" id="sSoundPick" type="button">Usar mi audio…</button>
+      <button class="ghost" id="sSoundReset" type="button" hidden>Volver al Faaa</button>
+      <input type="file" id="soundInput" accept="audio/*" class="hidden">
+    </div>
+    <p class="sound-note" id="sSoundNote"></p>
     <p>Excel: guardá una copia en Archivos o recuperá tus registros desde un archivo.</p>
     <div class="foot">
       <button class="ghost" id="btnExport" type="button">Exportar Excel</button>
