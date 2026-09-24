@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '61';
+const APP_VERSION = '62';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -389,17 +389,10 @@ for (const key of $('pad').querySelectorAll('.key')) {
 // ---------- sound: a synthesized "FAAAH" (prank-video style) when something is added ----------
 // Built with Web Audio, no audio file: a breathy "F" (filtered noise), then a shouted "AAAH" (two
 // sawtooth voices through vowel formants, soft-clipped, pitch leaping up and sagging with vibrato),
-// all in a big room reverb. A custom clip picked in Ajustes replaces it. Muted by the silent switch.
+// all in a big room reverb. A custom clip picked in Ajustes replaces it.
 const SOUND_KEY = 'comidas-libres:sound';
 const sound = (() => {
-  let ctx = null, room = null, clip = null, clipSrc = null;
-  const audio = () => {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return null;
-    if (!ctx) ctx = new AC();
-    if (ctx.state === 'suspended') ctx.resume();
-    return ctx;
-  };
+  let room = null;
   // decodeAudioData: callbacks for older Safari, a promise elsewhere (whose rejection must be caught too)
   const decode = (c, bytes) => new Promise((ok, ko) => {
     const p = c.decodeAudioData(bytes, ok, ko);
@@ -483,37 +476,67 @@ const sound = (() => {
     env.connect(out);
     for (const o of [...oscs, lfo]) { o.start(v); o.stop(end + 0.05); }
   }
-  async function playClip(c, src) {
-    if (clipSrc !== src) {
-      const bytes = await (await fetch(src)).arrayBuffer();
-      clip = await decode(c, bytes);
-      clipSrc = src;
+  // Playback goes through an <audio> element, not the live Web Audio graph: iOS mutes Web Audio with
+  // the silent switch (and keeps a context made outside a tap suspended), while media elements play
+  // like a video would. The Faaa is rendered once, offline, into WAV files the element can play.
+  const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const rendered = {};
+  function wav(buf) {
+    const d = buf.getChannelData(0), n = d.length, sr = buf.sampleRate;
+    let peak = 0;
+    for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(d[i]));
+    const g = peak ? 0.9 / peak : 1;
+    const ab = new ArrayBuffer(44 + n * 2), dv = new DataView(ab);
+    const tag = (o, t) => { for (let i = 0; i < 4; i++) dv.setUint8(o + i, t.charCodeAt(i)); };
+    tag(0, 'RIFF'); dv.setUint32(4, 36 + n * 2, true); tag(8, 'WAVE'); tag(12, 'fmt ');
+    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+    dv.setUint32(24, sr, true); dv.setUint32(28, sr * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+    tag(36, 'data'); dv.setUint32(40, n * 2, true);
+    for (let i = 0; i < n; i++) dv.setInt16(44 + i * 2, Math.max(-1, Math.min(1, d[i] * g)) * 32767, true);
+    return URL.createObjectURL(new Blob([ab], { type: 'audio/wav' }));
+  }
+  async function prerender() {
+    if (!Offline) return;
+    for (const big of [false, true]) {
+      const c = new Offline(1, Math.round(32000 * (big ? 2.9 : 2.4)), 32000);
+      faaa(c, big);
+      const buf = await new Promise((ok, ko) => {
+        c.oncomplete = (ev) => ok(ev.renderedBuffer);
+        const p = c.startRendering();
+        if (p && p.catch) p.catch(ko);
+      });
+      rendered[big] = wav(buf);
     }
-    const b = c.createBufferSource();
-    b.buffer = clip;
-    b.connect(c.destination);
-    b.start();
+  }
+  const ready = prerender().catch(() => {});
+  const el = new Audio();
+  el.preload = 'auto';
+  el.setAttribute('playsinline', '');
+  function source(big) {
+    let custom = null;
+    try { custom = localStorage.getItem(SOUND_KEY); } catch (e) { /* storage blocked */ }
+    return custom || rendered[big] || null;
   }
   return {
     faaa, // (context, big): also renders offline
+    ready,
     async canPlay(src) {
-      const c = audio();
-      if (!c) return false;
+      if (!Offline) return true;
       try {
         const bytes = await (await fetch(src)).arrayBuffer();
-        await decode(c, bytes);
+        await decode(new Offline(1, 1, 44100), bytes);
         return true;
       } catch (e) { return false; }
     },
-    // call from the tap itself: iOS only lets audio start inside a user gesture
+    // call from the tap itself: iOS only lets media start inside a user gesture
     play(big = false) {
       if (state.settings.sound === false) return;
-      const c = audio();
-      if (!c) return;
-      let custom = null;
-      try { custom = localStorage.getItem(SOUND_KEY); } catch (e) { /* storage blocked */ }
-      if (custom) playClip(c, custom).catch(() => faaa(c, big));
-      else faaa(c, big);
+      const src = source(big);
+      if (!src) return;
+      if (el.src !== src) el.src = src;
+      try { el.currentTime = 0; } catch (e) { /* not loaded yet */ }
+      const p = el.play();
+      if (p && p.catch) p.catch(() => {});
     },
   };
 })();
@@ -1638,8 +1661,8 @@ function renderSoundSettings() {
   $('sSound').checked = state.settings.sound !== false;
   $('sSoundReset').hidden = !custom;
   $('sSoundNote').textContent = custom
-    ? 'Suena tu audio. Con el iPhone en silencio no suena.'
-    : 'Suena el "Faaa" de la app (más largo en la comida completa). Con el iPhone en silencio no suena.';
+    ? 'Suena tu audio, también con el iPhone en silencio (usa el volumen multimedia).'
+    : 'Suena el "Faaa" de la app (más largo en la comida completa), también con el iPhone en silencio.';
 }
 $('sSound').onchange = () => { state.settings.sound = $('sSound').checked; persist(); renderSoundSettings(); };
 $('sSoundTest').onclick = () => { const was = state.settings.sound; state.settings.sound = true; sound.play(); state.settings.sound = was; };
