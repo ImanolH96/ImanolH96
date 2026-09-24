@@ -681,7 +681,7 @@
       </g>
     </svg>
   </section>
-  <p class="hint">El centro suma una comida libre completa; cada parte del anillo suma ⅓. Otro toque la saca.</p>
+  <p class="hint" id="padHint">El centro suma una comida libre completa; cada parte del anillo suma ⅓. Otro toque la saca.</p>
 
     <section class="log">
       <h2 id="dayTitle">Registros de hoy</h2>
@@ -823,7 +823,7 @@
 <div class="scrim" id="icsSheet" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="icsTitle">
     <h3 id="icsTitle">¿Cuáles son comidas libres?</h3>
-    <p>Marcá los eventos que vas a reservar. Tocá el número para cambiar cuánto vale (⅓, ⅔ o 1).</p>
+    <p id="icsHint">Marcá los eventos que vas a reservar. Tocá el número para cambiar cuánto vale (⅓, ⅔ o 1).</p>
     <ul class="ics-list" id="icsList"></ul>
     <div class="actions">
       <button class="solid" type="button" id="icsSave">Reservar</button>
@@ -853,6 +853,9 @@
         <select id="sWeekStart"><option value="1">Lunes</option><option value="0">Domingo</option></select>
       </label>
     </div>
+    <label class="field"><span>Contar en</span>
+      <select id="sUnits"><option value="tercios">Comidas libres (⅓, ⅔, 1…)</option><option value="porciones">Porciones enteras (1 por parte, 3 la completa)</option></select>
+    </label>
     <label class="field"><span>Fecha de tu consulta (inicio del plan)</span><input type="date" id="sCycle"></label>
     <p>Con la fecha cargada, cada "mes" es un ciclo de 4 semanas desde la consulta y las semanas empiezan ese día. Dejala vacía para usar los meses del calendario.</p>
     <label class="field"><span>Google Client ID (para Google Calendar)</span><input id="sGcal" placeholder="123…apps.googleusercontent.com" autocapitalize="off" autocorrect="off" spellcheck="false"></label>

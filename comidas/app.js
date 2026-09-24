@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '62';
+const APP_VERSION = '63';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -101,7 +101,17 @@ function weekBounds(ref = new Date()) {
 const partsOf = (e) => PARTS.filter(([k]) => e.partes && e.partes[k]).length;
 const thirdsOf = (e) => (e.completa ? 3 : partsOf(e));
 
+// Units (Ajustes → "Contar en"): by default amounts are free meals in thirds (⅓, ⅔, 1⅓…).
+// With settings.units = 'porciones' they're whole porciones instead: comida, alcohol or dulce = 1,
+// a whole free meal = 3. Only the display changes; everything is stored and computed in thirds.
+const inPorciones = () => state.settings.units === 'porciones';
+const porciones = (n) => `${n} ${n === 1 ? 'porción' : 'porciones'}`;
+// the weekly quota as a number in the current unit (thirds in): 2 comidas libres, or 6 porciones
+const quotaN = (q) => (inPorciones() ? q : q / 3);
+// "2 comidas libres" / "6 porciones" for an allowance in thirds
+const allowanceWord = (a) => (inPorciones() ? porciones(a) : `${fmtThirds(a)} comidas libres`);
 function fmtThirds(n) {
+  if (inPorciones()) return String(n);
   const whole = Math.floor(n / 3);
   const frac = ['', '⅓', '⅔'][n % 3];
   if (!whole) return frac || '0';
@@ -541,6 +551,21 @@ const sound = (() => {
   };
 })();
 
+// the dial's value pills and the hints under it follow the unit
+function renderUnitLabels() {
+  const p = inPorciones();
+  for (const key of $('pad').querySelectorAll('.key')) {
+    key.querySelector('.pill text').textContent = key.dataset.part === 'completa' ? (p ? '3' : '1') : (p ? '1' : '⅓');
+  }
+  $('padHint').textContent = p
+    ? 'Cada parte del anillo suma 1 porción; el centro, una comida libre completa, suma 3. Otro toque la saca.'
+    : 'El centro suma una comida libre completa; cada parte del anillo suma ⅓. Otro toque la saca.';
+  $('icsHint').textContent = p
+    ? 'Marcá los eventos que vas a reservar. Tocá el número para cambiar cuántas porciones vale (1, 2 o 3 = completa).'
+    : 'Marcá los eventos que vas a reservar. Tocá el número para cambiar cuánto vale (⅓, ⅔ o 1).';
+}
+renderUnitLabels();
+
 // the dial's parts are SVG groups: press feedback by hand, keyboard like a button
 for (const key of $('pad').querySelectorAll('.key')) {
   const press = (on) => key.classList.toggle('pressed', on);
@@ -853,14 +878,14 @@ function weekHero({ used, quota, slices, current, daysLeft, fresh }) {
   const left = quota - used;
   let cap, num, sub;
   if (left < 0) {
-    cap = 'Te pasaste'; num = `+${fmtThirds(-left)}`; sub = `sobre tu cupo de ${quota / 3}`;
+    cap = 'Te pasaste'; num = `+${fmtThirds(-left)}`; sub = `sobre tu cupo de ${quotaN(quota)}`;
   } else if (current) {
     const days = daysLeft === 1 ? 'último día' : `quedan ${daysLeft} días`;
-    cap = left === 1 || left === 3 ? 'Te queda' : 'Te quedan';
+    cap = left === 1 || (left === 3 && !inPorciones()) ? 'Te queda' : 'Te quedan';
     num = fmtThirds(left);
-    sub = left === 0 ? `Cupo completo · ${days}` : `de ${mealsWord(quota / 3)} · ${days}`;
+    sub = left === 0 ? `Cupo completo · ${days}` : `de ${inPorciones() ? porciones(quota) : mealsWord(quota / 3)} · ${days}`;
   } else {
-    cap = 'Usaste'; num = fmtThirds(used); sub = `de ${mealsWord(quota / 3)}`;
+    cap = 'Usaste'; num = fmtThirds(used); sub = `de ${inPorciones() ? porciones(quota) : mealsWord(quota / 3)}`;
   }
   const hero = document.createElement('span');
   hero.className = 'hero' + (left < 0 ? ' over' : '');
@@ -895,7 +920,7 @@ function renderToday() {
   const hero = weekHero({ used, quota, slices, current: true, daysLeft });
 
   const notes = [];
-  if (reserved) notes.push(`${fmtThirds(reserved)} reservado para eventos`);
+  if (reserved) notes.push(inPorciones() ? `${porciones(reserved)} reservadas para eventos` : `${fmtThirds(reserved)} reservado para eventos`);
   const planned = state.alloc[from];
   if (planned) notes.push(`tu plan: ${fmtThirds(planned)} más`);
   box.append(head, hero);
@@ -967,7 +992,7 @@ function summaryLines(S) {
   const day = standout(S.byDay, S.total, (k) => `el día con más, ${k}`);
   return {
     head: `${where} ${S.title}`,
-    total: `${fmtThirds(S.total)} de ${fmtThirds(S.allowed)} comidas libres`,
+    total: `${fmtThirds(S.total)} de ${allowanceWord(S.allowed)}`,
     course: S.inCourse ? `En curso: semana ${S.weeks.length} de ${S.span.weeks.length}` : doneWeeks ? `${inPlan} de ${doneWeeks} semanas dentro del cupo` : '',
     when: [meal, day].filter(Boolean).join('; '),
   };
@@ -976,7 +1001,7 @@ function summaryLines(S) {
 function summaryText(S) {
   const L = summaryLines(S);
   const out = [`🍽️ Comidas libres · ${L.head}`, `Total: ${L.total}${L.course ? ` (${L.course.charAt(0).toLowerCase() + L.course.slice(1)})` : ''}`, '', 'Semanas:'];
-  for (const w of S.weeks) out.push(`${w.st.icon} ${weekRangeLabel(w.from, w.to, true)}: ${fmtThirds(w.used)} de ${S.quota / 3}`);
+  for (const w of S.weeks) out.push(`${w.st.icon} ${weekRangeLabel(w.from, w.to, true)}: ${fmtThirds(w.used)} de ${quotaN(S.quota)}`);
   if (S.kinds.length) out.push('', `Qué fue: ${S.kinds.map((k) => `${k.icon} ${k.label.split(' ')[0].toLowerCase()} ${k.n}`).join(' · ')}`);
   if (L.when) out.push(`Cuándo: ${L.when}`);
   const rated = S.joy.filter((j) => j.list.length);
@@ -998,7 +1023,7 @@ function openSummary() {
   box.innerHTML = '';
   $('summaryTitle').textContent = L.head;
   const top = el('div', 'sum-top');
-  top.append(el('b', 'sum-total', fmtThirds(S.total)), el('span', '', ` de ${fmtThirds(S.allowed)} comidas libres`));
+  top.append(el('b', 'sum-total', fmtThirds(S.total)), el('span', '', ` de ${allowanceWord(S.allowed)}`));
   box.append(top);
   if (L.course) box.append(el('p', 'sum-note', L.course));
 
@@ -1007,7 +1032,7 @@ function openSummary() {
   for (const w of S.weeks) {
     const li = el('li', `s-${w.st.key}`);
     li.append(el('i', 'st', w.st.icon), el('span', 'sum-range', weekRangeLabel(w.from, w.to, true)),
-      weekPlates(w.slices, S.quota), el('span', 'sum-val', `${fmtThirds(w.used)} / ${S.quota / 3}`));
+      weekPlates(w.slices, S.quota), el('span', 'sum-val', `${fmtThirds(w.used)} / ${quotaN(S.quota)}`));
     wl.append(li);
   }
   box.append(wl);
@@ -1103,7 +1128,7 @@ function renderMonth() {
   else mst = { key: 'good', icon: '✓', label: isCur ? 'Vas bien' : 'Dentro del plan' };
   $('monthTotal').append(
     Object.assign(document.createElement('b'), { textContent: fmtThirds(total) }),
-    ` de ${fmtThirds(allowed)} comidas libres ${state.settings.cycleStart ? 'en el ciclo' : 'en el mes'}`,
+    ` de ${allowanceWord(allowed)} ${state.settings.cycleStart ? 'en el ciclo' : 'en el mes'}`,
     Object.assign(document.createElement('span'), { textContent: `${span.weeks.length} semanas, del ${spanLabel(span)}` }),
     Object.assign(document.createElement('span'), { textContent: counts }),
   );
@@ -1113,7 +1138,7 @@ function renderMonth() {
   // what's left counts the events already planned for the rest of the month
   $('monthAdvice').textContent = isCur
     ? monthAdvice(total + reservedMonth, allowed, span.days - daysSoFar + 1, parseDate(last))
-      + (reservedMonth ? ` Ya descuenta ${fmtThirds(reservedMonth)} reservado para eventos.` : '')
+      + (reservedMonth ? ` Ya descuenta ${inPorciones() ? `${porciones(reservedMonth)} reservadas` : `${fmtThirds(reservedMonth)} reservado`} para eventos.` : '')
     : '';
 
   renderChart(y, m, inMonth);
@@ -1142,10 +1167,10 @@ function renderMonth() {
     bar.appendChild(fill);
     const val = Object.assign(document.createElement('span'), {
       className: 'wkval',
-      textContent: used > quota ? fmtUsed(used, quota) : `${fmtThirds(used)} / ${quota / 3}`,
+      textContent: used > quota ? fmtUsed(used, quota) : `${fmtThirds(used)} / ${quotaN(quota)}`,
     });
     b.append(icon, label, bar, val);
-    b.setAttribute('aria-label', `Semana del ${weekRangeLabel(from, to)}: ${fmtThirds(used)} de ${quota / 3}, ${st.label}. Ver semana`);
+    b.setAttribute('aria-label', `Semana del ${weekRangeLabel(from, to)}: ${fmtThirds(used)} de ${quotaN(quota)}, ${st.label}. Ver semana`);
     li.appendChild(b);
     ul.appendChild(li);
   }
@@ -1210,7 +1235,7 @@ function renderCumulative(y, m, inMonth) {
   const step = maxY <= 5 ? 1 : maxY <= 10 ? 2 : 5;
   for (let v = 0; v <= maxY; v += step) {
     el('line', { x1: L, x2: W - R + 8, y1: yv(v), y2: yv(v), class: v === 0 ? 'axis' : 'grid' }, svg);
-    el('text', { x: L - 8, y: yv(v) + 4, class: 'tick', 'text-anchor': 'end' }, svg).textContent = v;
+    el('text', { x: L - 8, y: yv(v) + 4, class: 'tick', 'text-anchor': 'end' }, svg).textContent = inPorciones() ? v * 3 : v;
   }
   // x ticks: weekly-ish plus the last day
   for (let d = 1; d <= days; d += 7) {
@@ -1394,7 +1419,7 @@ function renderWeekly(y, m) {
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
   for (let v = 0; v <= maxY; v += maxY <= 5 ? 1 : 2) {
     el('line', { x1: L, x2: W - R + 6, y1: yv(v), y2: yv(v), class: v === 0 ? 'axis' : 'grid' }, svg);
-    el('text', { x: L - 8, y: yv(v) + 4, class: 'tick', 'text-anchor': 'end' }, svg).textContent = v;
+    el('text', { x: L - 8, y: yv(v) + 4, class: 'tick', 'text-anchor': 'end' }, svg).textContent = inPorciones() ? v * 3 : v;
   }
   const band = (W - L - R) / Math.max(weeks.length, 1);
   const bw = Math.min(24, band * 0.5);
@@ -1691,6 +1716,7 @@ $('sSoundReset').onclick = () => {
 
 $('btnSettings').onclick = () => {
   renderSoundSettings();
+  $('sUnits').value = inPorciones() ? 'porciones' : 'tercios';
   $('appVersion').textContent = `Versión ${APP_VERSION}`;
   $('sQuota').value = state.settings.quota;
   $('sWeekStart').value = String(state.settings.weekStart);
@@ -1716,8 +1742,10 @@ $('btnSaveSettings').onclick = () => {
   if (cyc) state.settings.cycleStart = cyc; else delete state.settings.cycleStart;
   state.settings.ranges = ranges;
   state.settings.gcalClientId = $('sGcal').value.trim();
+  if ($('sUnits').value === 'porciones') state.settings.units = 'porciones'; else delete state.settings.units;
   persist();
   closeSheet('settingsSheet');
+  renderUnitLabels();
   render();
   toast('Ajustes guardados');
 };
@@ -1982,13 +2010,15 @@ function renderPlan() {
   big.append(Object.assign(document.createElement('small'), { textContent: free >= 0 ? 'Te quedan' : 'Con lo reservado quedás' }),
     Object.assign(document.createElement('b'), { textContent: free >= 0 ? fmtThirds(free) : `+${fmtThirds(-free)}` }),
     Object.assign(document.createElement('span'), {
-      textContent: free < 0 ? `por encima del límite de ${monthName}` : `${free === 3 ? 'comida libre' : free > 0 && free < 3 ? 'de comida libre' : 'comidas libres'} en ${monthName}`,
+      textContent: free < 0 ? `por encima del límite de ${monthName}`
+        : inPorciones() ? `${free === 1 ? 'porción' : 'porciones'} en ${monthName}`
+        : `${free === 3 ? 'comida libre' : free > 0 && free < 3 ? 'de comida libre' : 'comidas libres'} en ${monthName}`,
     }));
   card.append(big, mealTokens(allowed, used, reserved));
   const math = document.createElement('p');
   math.className = 'plan-math';
   math.textContent = `${fmtThirds(allowed)} ${state.settings.cycleStart ? 'del ciclo' : 'del mes'} − ${fmtThirds(used)} usadas − ${fmtThirds(reserved)} reservadas = ${free < 0 ? '−' + fmtThirds(-free) : fmtThirds(free)}`;
-  const note = Object.assign(document.createElement('p'), { className: 'plan-span', textContent: `${span.weeks.length} semanas × ${quota}, del ${spanLabel(span)}` });
+  const note = Object.assign(document.createElement('p'), { className: 'plan-span', textContent: `${span.weeks.length} semanas × ${quotaN(quota * 3)}, del ${spanLabel(span)}` });
   card.append(math, note);
 
   renderPlayground(span, today, free);
@@ -2028,7 +2058,7 @@ function planRow(p) {
   main.className = 'pmain';
   main.onclick = () => openPlan(p.id);
   main.append(Object.assign(document.createElement('b'), { textContent: `${planIcon(p)} ${p.nombre}` }),
-    Object.assign(document.createElement('span'), { textContent: `${p.momento}, ${p.valor === 3 ? '1 comida libre' : `${fmtThirds(p.valor)} de comida libre`}` }));
+    Object.assign(document.createElement('span'), { textContent: `${p.momento}, ${inPorciones() ? porciones(p.valor) : p.valor === 3 ? '1 comida libre' : `${fmtThirds(p.valor)} de comida libre`}` }));
   li.append(date, main);
   if (p.fecha <= today) {
     const reg = Object.assign(document.createElement('button'), { type: 'button', className: 'preg', textContent: 'Registrar' });
@@ -2110,7 +2140,7 @@ function renderPlayground(span, today, free) {
     head.append(Object.assign(document.createElement('b'), { textContent: (cur ? 'Esta semana, ' : '') + weekRangeLabel(from, to, true) }),
       Object.assign(document.createElement('span'), {
         className: 'pg-total',
-        textContent: `${fmtThirds(tot)} de ${q / 3}` + (tot > q ? ` (+${fmtThirds(tot - q)})` : ''),
+        textContent: `${fmtThirds(tot)} de ${quotaN(q)}` + (tot > q ? ` (+${fmtThirds(tot - q)})` : ''),
       }));
     // bar: used + reserved + assigned against the weekly quota
     const max = Math.max(q, tot, 3);
@@ -2251,7 +2281,7 @@ function renderPlanSheet() {
 function renderPlanValor() {
   const box = $('planValor');
   box.innerHTML = '';
-  for (const [v, label] of [[1, '⅓'], [2, '⅔'], [3, '1 completa']]) {
+  for (const [v, label] of inPorciones() ? [[1, '1'], [2, '2'], [3, '3 · completa']] : [[1, '⅓'], [2, '⅔'], [3, '1 completa']]) {
     const b = Object.assign(document.createElement('button'), { type: 'button', textContent: label });
     b.setAttribute('aria-pressed', String(planValor === v));
     b.onclick = () => { planValor = v; renderPlanValor(); };
@@ -2392,7 +2422,7 @@ function renderICS() {
       Object.assign(document.createElement('span'), { className: 'ics-date', textContent: d.toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/^\w/, (x) => x.toUpperCase()) }),
       Object.assign(document.createElement('b'), { textContent: c.nombre }));
     pick.onclick = () => { c.on = !c.on; renderICS(); };
-    const val = Object.assign(document.createElement('button'), { type: 'button', className: 'ics-val', textContent: c.valor === 3 ? '1' : fmtThirds(c.valor) });
+    const val = Object.assign(document.createElement('button'), { type: 'button', className: 'ics-val', textContent: c.valor === 3 && !inPorciones() ? '1' : fmtThirds(c.valor) });
     val.setAttribute('aria-label', `Valor ${val.textContent}. Cambiar`);
     val.onclick = () => { c.valor = c.valor === 3 ? 1 : c.valor + 1; c.on = true; renderICS(); };
     li.append(pick, val);
