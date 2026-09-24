@@ -9,7 +9,7 @@ En Registrar, la tarjeta "Esta semana" dice en grande cuánto te queda ("Te qued
 
 Al abrir, Registrar cae en la comida que ya tiene algo registrado hoy (la de la hora si tiene; si no, la última registrada); si no hay nada, elige por la hora. En el selector, las comidas con registros ese día llevan un puntito lavanda.
 
-Cuatro pestañas abajo: **Registrar** (abre siempre en el día de hoy; se puede cambiar a ayer u otro día), **Semana**, **Mes** y **Planificar**. Exportar/importar Excel está en ⚙️ Ajustes.
+Cuatro pestañas abajo: **Registrar** (abre siempre en el día de hoy; se puede cambiar a ayer u otro día), **Semana**, **Mes** y **Planificar**. El ⚙️ de arriba a la derecha abre un menú con Exportar Excel (con la fecha de tu última copia), Importar Excel y Ajustes.
 
 - **Botonera circular estilo Simon**: el anillo tiene 🍔🌮 Comida fuera del plan, 🍷🍺 Alcohol y 🥐🍰 Dulce (medialunas, facturas, postres, golosinas), con los emojis grandes de fondo y el nombre encima (⅓ cada una; las tres forman una comida libre) y el centro es 🍽️ Comida libre completa (1). Cada parte es una tecla redondeada de una sola pieza (borde almohadillado, canto macizo, sombra suave) que se hunde al tocarla, con vibración en el iPhone (iOS 18+); la ya sumada queda metida en su hueco (mismo color, con una sombra fina en el borde y ✓), y otro toque la saca.
 - El centro **🍽️ Comida libre completa** registra 1 comida libre entera como registro propio (se suma a las partes que haya en ese momento) (también se puede activar desde el detalle de un registro con "Contar como comida libre completa"). En gráficas aparece en lavanda y el Excel tiene la columna "Completa".

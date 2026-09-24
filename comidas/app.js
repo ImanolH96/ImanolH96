@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '63';
+const APP_VERSION = '64';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -409,7 +409,7 @@ const sound = (() => {
     if (p && p.catch) p.catch(ko);
   });
   const reverb = (c) => {
-    if (room) return room;
+    if (room && room.sampleRate === c.sampleRate) return room;
     const len = Math.round(c.sampleRate * 1.6);
     room = c.createBuffer(2, len, c.sampleRate);
     for (let ch = 0; ch < 2; ch++) {
@@ -1090,6 +1090,7 @@ function showTab(t) {
   }
   $('tabTitle').textContent = TAB_TITLES[t];
   currentTab = t;
+  closeMenu();
   renderTab(t);
   hideTip();
   window.scrollTo(0, 0);
@@ -1714,6 +1715,33 @@ $('sSoundReset').onclick = () => {
   toast('Volviste al Faaa');
 };
 
+// ---------- the gear's menu ----------
+function lastExportLabel() {
+  const d = state.settings.lastExport;
+  if (!d) return 'Todavía no guardaste ninguna copia';
+  const days = Math.round((parseDate(isoDate(new Date())) - parseDate(d)) / 864e5);
+  return `Última copia: ${days === 0 ? 'hoy' : days === 1 ? 'ayer' : `hace ${days} días`}`;
+}
+function closeMenu() {
+  $('appMenu').hidden = true;
+  $('btnMenu').setAttribute('aria-expanded', 'false');
+}
+function openMenu() {
+  $('menuLastExport').textContent = lastExportLabel();
+  $('appMenu').hidden = false;
+  $('btnMenu').setAttribute('aria-expanded', 'true');
+  $('appMenu').querySelector('button').focus({ preventScroll: true });
+}
+$('btnMenu').onclick = () => ($('appMenu').hidden ? openMenu() : closeMenu());
+// any item closes it; a tap outside or Escape too
+$('appMenu').addEventListener('click', (ev) => { if (ev.target.closest('button')) closeMenu(); });
+document.addEventListener('pointerdown', (ev) => {
+  if (!$('appMenu').hidden && !ev.target.closest('#appMenu, #btnMenu')) closeMenu();
+});
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape' && !$('appMenu').hidden) { closeMenu(); $('btnMenu').focus(); }
+});
+
 $('btnSettings').onclick = () => {
   renderSoundSettings();
   $('sUnits').value = inPorciones() ? 'porciones' : 'tercios';
@@ -1724,8 +1752,13 @@ $('btnSettings').onclick = () => {
   $('sWeekStart').disabled = !!state.settings.cycleStart;
   for (const m of Object.keys(DEFAULT_RANGES)) $(`sRange${m}`).value = state.settings.ranges[m];
   $('sGcal').value = state.settings.gcalClientId || '';
+  const hasId = !!(state.settings.gcalClientId || '').trim();
+  $('gcalSet').hidden = !hasId;
+  $('gcalField').hidden = hasId;
   openSheet('settingsSheet');
 };
+
+$('gcalChange').onclick = () => { $('gcalSet').hidden = true; $('gcalField').hidden = false; $('sGcal').focus(); };
 
 $('btnSaveSettings').onclick = () => {
   const ranges = {};
@@ -1951,7 +1984,6 @@ $('btnImport').onclick = () => $('fileInput').click();
 $('fileInput').onchange = async (ev) => {
   const f = ev.target.files[0];
   ev.target.value = '';
-  closeSheet('settingsSheet');
   if (f) importXlsx(f).catch(() => toast('No se pudo leer el archivo'));
 };
 
