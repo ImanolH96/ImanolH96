@@ -171,6 +171,9 @@
   .sday[aria-pressed="true"] small { color: var(--ink); }
   .sday.today[aria-pressed="true"] { background: var(--comida); box-shadow: none; }
   .sday.today[aria-pressed="true"] small, .sday.today[aria-pressed="true"] b { color: var(--ink-deep); }
+  .sday .mark { width: 6px; height: 6px; margin-top: 3px; border-radius: 50%; }
+  .sday .mark.on { background: var(--completa); }
+  .sday[aria-pressed="true"] .mark.on { background: var(--completa-deep); }
   .sday:disabled { opacity: .3; cursor: default; }
   .sday:not(:disabled):not([aria-pressed="true"]):active { background: var(--panel); }
   .to-today {

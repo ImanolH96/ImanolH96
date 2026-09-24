@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '64';
+const APP_VERSION = '65';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -249,6 +249,8 @@ function renderStrip() {
     const wd = d.toLocaleDateString('es', { weekday: 'short' }).replace('.', '');
     b.append(Object.assign(document.createElement('small'), { textContent: iso === today ? 'Hoy' : wd.charAt(0).toUpperCase() }),
       Object.assign(document.createElement('b'), { textContent: d.getDate() }));
+    // a dot under days that have something logged
+    b.append(Object.assign(document.createElement('i'), { className: list.length ? 'mark on' : 'mark', ariaHidden: 'true' }));
     const long = d.toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' });
     const n = list.reduce((t, e) => t + thirdsOf(e), 0);
     b.setAttribute('aria-label', `${iso === today ? 'Hoy, ' : ''}${long}${n ? `, ${fmtThirds(n)} registrado` : ''}`);
