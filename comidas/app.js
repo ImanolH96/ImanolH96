@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '65';
+const APP_VERSION = '66';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -1730,13 +1730,26 @@ function closeMenu() {
 }
 function openMenu() {
   $('menuLastExport').textContent = lastExportLabel();
+  renderSoundToggle();
   $('appMenu').hidden = false;
   $('btnMenu').setAttribute('aria-expanded', 'true');
   $('appMenu').querySelector('button').focus({ preventScroll: true });
 }
 $('btnMenu').onclick = () => ($('appMenu').hidden ? openMenu() : closeMenu());
 // any item closes it; a tap outside or Escape too
-$('appMenu').addEventListener('click', (ev) => { if (ev.target.closest('button')) closeMenu(); });
+$('appMenu').addEventListener('click', (ev) => { const b = ev.target.closest('button'); if (b && !('keep' in b.dataset)) closeMenu(); });
+// quick sound switch, right in the menu (it stays open so you see it flip)
+function renderSoundToggle() {
+  const on = state.settings.sound !== false;
+  $('btnSoundToggle').setAttribute('aria-checked', String(on));
+  $('menuSoundState').textContent = on ? 'Activado' : 'Apagado';
+}
+$('btnSoundToggle').onclick = () => {
+  state.settings.sound = state.settings.sound === false;
+  persist();
+  renderSoundToggle();
+  if (state.settings.sound) sound.play();
+};
 document.addEventListener('pointerdown', (ev) => {
   if (!$('appMenu').hidden && !ev.target.closest('#appMenu, #btnMenu')) closeMenu();
 });
