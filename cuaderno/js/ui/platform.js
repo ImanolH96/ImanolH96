@@ -15,15 +15,20 @@ export async function copyText(text) {
   }
 }
 
+// Opens the system share sheet (on iPhone: "Guardar en Archivos"). Some browsers refuse files of a type
+// they don't know (e.g. text/markdown), so text files are retried as text/plain with the same name.
 export async function saveFile(name, blob) {
-  try {
-    const file = new File([blob], name, { type: blob.type });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: name });
-      return true;
+  const types = [blob.type, blob.type.startsWith('text/') || blob.type === 'application/json' ? 'text/plain' : null];
+  for (const type of types.filter((t, i) => t && types.indexOf(t) === i)) {
+    try {
+      const file = new File([blob], name, { type });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: name });
+        return true;
+      }
+    } catch (e) {
+      if (e && e.name === 'AbortError') return false;
     }
-  } catch (e) {
-    if (e && e.name === 'AbortError') return false;
   }
   const a = h('a', { href: URL.createObjectURL(blob), download: name });
   document.body.append(a);
