@@ -53,7 +53,7 @@ export const toMarkdownAll = (notas) => notas.map(toMarkdown).join('\n');
 export function parseMarkdown(text) {
   // chatbots wrap the answer in a ```markdown fence so it can be copied
   const blocks = [...text.matchAll(/```[ \t]*(?:markdown|md)?[ \t]*\n([\s\S]*?)\n[ \t]*```/gi)].map((m) => m[1]).filter((b) => HEADER.test(b));
-  const lines = (blocks.length ? blocks.join('\n\n') : text).split(/\r?\n/);
+  const lines = (blocks.length ? blocks.join('\n\n') : text).replace(/<!--[\s\S]*?-->/g, '').split(/\r?\n/); // templates carry <!-- hints -->
   const isStart = (i) => lines[i].trim() === '---' && /^\s*(?:tipo|t[ií]tulo|id)\s*:/i.test(lines[i + 1] || '');
 
   const notes = [];
@@ -75,7 +75,7 @@ function buildNote(head, body) {
   const meta = {};
   for (const l of head) {
     const m = l.match(/^\s*([^:]+?)\s*:\s*(.*)$/);
-    if (m) meta[plain(m[1])] = m[2].trim().replace(/^["']|["']$/g, '');
+    if (m) meta[plain(m[1])] = m[2].replace(/\s+#\s.*$/, '').trim().replace(/^["']|["']$/g, ''); // "value   # hint"
   }
   const tags = (meta.etiquetas || meta.tags || '').replace(/^\[|\]$/g, '');
   const raw = {
