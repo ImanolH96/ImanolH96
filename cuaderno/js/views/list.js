@@ -4,6 +4,8 @@ import { go } from '../core/router.js';
 import { state } from '../core/store.js';
 import { imgEl } from '../data/images.js';
 import { sheet } from '../ui/overlays.js';
+import { checkRepoChanges } from '../data/repo.js';
+import { repoSyncSheet } from '../ui/repoSheet.js';
 
 // Filter state survives navigating into a note and back.
 const filters = { q: '', tipo: 'todo', tag: '' };
@@ -86,6 +88,15 @@ export function viewList() {
         n.etiquetas.length > 0 && h('div', { class: 'tagline' }, n.etiquetas.slice(0, 4).map((t) => h('span', { class: 'tag' }, '#' + t)))));
   }
 
+  // notes changed in the repo's contenido/ folder: offer them, never apply silently
+  const banner = h('button', { class: 'btn', hidden: true });
+  checkRepoChanges().then((plan) => {
+    if (!plan.total) return;
+    banner.textContent = `📥 ${plan.total} cambio${plan.total === 1 ? '' : 's'} en el repo · Ver`;
+    banner.hidden = false;
+    banner.onclick = () => repoSyncSheet(plan, () => { banner.hidden = true; refresh(); });
+  }).catch(() => {});
+
   const search = h('input', {
     class: 'search', type: 'search', placeholder: 'Buscar recetas, ejercicios, notas…', value: filters.q,
     enterKeyHint: 'search', autocomplete: 'off',
@@ -97,7 +108,7 @@ export function viewList() {
       h('h1', {}, 'Cuaderno'),
       h('button', { class: 'icon-btn', onclick: () => go('#/ia'), 'aria-label': 'IA' }, '✨'),
       h('button', { class: 'icon-btn', onclick: () => go('#/ajustes'), 'aria-label': 'Ajustes' }, '⚙️')),
-    search, chipsBox, tagsBox, count, listBox,
+    banner, search, chipsBox, tagsBox, count, listBox,
     h('button', { class: 'fab', onclick: addSheet, 'aria-label': 'Nueva' }, '+'));
   refresh();
   return view;

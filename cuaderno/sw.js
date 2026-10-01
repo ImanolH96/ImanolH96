@@ -1,11 +1,11 @@
 // Network-first service worker: online you always get the latest version; offline, the cached copy.
-const CACHE = 'cuaderno-v3';
+const CACHE = 'cuaderno-v4';
 const ASSETS = [
   './', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png', 'fonts/bricolage.woff2', 'css/styles.css',
   'js/main.js', 'js/config.js',
   'js/core/dom.js', 'js/core/store.js', 'js/core/router.js',
-  'js/data/model.js', 'js/data/markdown.js', 'js/data/images.js', 'js/data/ai.js', 'js/data/backup.js',
-  'js/ui/overlays.js', 'js/ui/platform.js', 'js/ui/components.js',
+  'js/data/model.js', 'js/data/markdown.js', 'js/data/images.js', 'js/data/ai.js', 'js/data/backup.js', 'js/data/repo.js',
+  'js/ui/overlays.js', 'js/ui/platform.js', 'js/ui/components.js', 'js/ui/repoSheet.js',
   'js/views/list.js', 'js/views/detail.js', 'js/views/edit.js', 'js/views/ia.js', 'js/views/settings.js',
 ];
 
