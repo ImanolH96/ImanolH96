@@ -19,5 +19,26 @@ No usa APIs ni claves: el puente es copiar y pegar un JSON.
 ## Publicar en GitHub Pages
 Repo → Settings → Pages → *Deploy from a branch* → rama y carpeta `/ (root)`. La app queda en `https://<usuario>.github.io/<repo>/cuaderno/`. En iPhone: Safari → Compartir → *Agregar a pantalla de inicio*.
 
-## Archivos
-`index.html` (estilos), `app.js` (lógica), `sw.js` (offline, network-first), `manifest.webmanifest`, íconos y la fuente Bricolage (OFL).
+## Estructura del código
+JavaScript con módulos ES nativos: sin build ni dependencias, se edita y se publica tal cual. Las dependencias van en una sola dirección (`views` → `data`/`ui` → `core`), así que un módulo de abajo nunca importa uno de arriba.
+
+```
+index.html          esqueleto (carga css/styles.css y js/main.js)
+css/styles.css      estilos y colores (variables CSS, claro/oscuro)
+js/main.js          arranque: registra las rutas y el service worker
+js/config.js        constantes: tipos de nota, links de IA, versión
+js/core/            dom.js (helper h), store.js (estado + localStorage), router.js (rutas por hash)
+js/data/            model.js (forma de una nota y normalización), images.js (IndexedDB + fotos),
+                    ai.js (prompts, parseo e importación), backup.js (exportar copia)
+js/ui/              overlays.js (toast, sheet, lightbox), platform.js (portapapeles, archivos), components.js
+js/views/           una pantalla por archivo: list, detail, edit, ia, settings
+sw.js               offline (network-first); su lista ASSETS debe incluir cada archivo nuevo
+```
+
+Para agregar algo:
+- **Una pantalla nueva:** crear `js/views/x.js` que exporte `viewX()` y registrarla en `js/main.js`.
+- **Un campo nuevo en las notas:** `data/model.js` (normalize), `views/edit.js`, `views/detail.js` y la descripción del formato en `data/ai.js` para que las IAs lo conozcan.
+- **Un tipo nuevo de nota:** `config.js` (TIPOS) más lo anterior.
+- Al sumar archivos, agregarlos a `ASSETS` en `sw.js` y subir `CACHE`.
+
+Las fotos de `comidas/` y este código no comparten nada: cada app es independiente.
