@@ -1,0 +1,15 @@
+{
+  "name": "Cuaderno",
+  "short_name": "Cuaderno",
+  "description": "Recetas, ejercicios del gimnasio y notas, editables con tu IA favorita.",
+  "lang": "es",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#faf6ef",
+  "theme_color": "#c8553d",
+  "icons": [
+    { "src": "icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
