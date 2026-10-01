@@ -56,7 +56,7 @@ sw.js               offline (network-first); su lista ASSETS debe incluir cada a
 
 Para agregar algo:
 - **Una pantalla nueva:** crear `js/views/x.js` que exporte `viewX()` y registrarla en `js/main.js`.
-- **Un campo nuevo en las notas:** `data/model.js` (normalize), `views/edit.js`, `views/detail.js` `data/markdown.js` (leer/escribir) y la descripción del formato en `data/ai.js` para que las IAs lo conozcan.
+- **Un campo nuevo en las notas:** `data/model.js` (normalize), `views/edit.js`, `views/detail.js`, `data/markdown.js` (leer/escribir) y la descripción del formato en `data/ai.js` para que las IAs lo conozcan.
 - **Un tipo nuevo de nota:** `config.js` (TIPOS) más lo anterior.
 - Al sumar archivos, agregarlos a `ASSETS` en `sw.js` y subir `CACHE`.
 
