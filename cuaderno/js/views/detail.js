@@ -4,9 +4,10 @@ import { go, onLeave } from '../core/router.js';
 import { state, persist } from '../core/store.js';
 import { imgEl, removeImage } from '../data/images.js';
 import { toPlainText } from '../data/model.js';
+import { toMarkdown } from '../data/markdown.js';
 import { promptEdit } from '../data/ai.js';
 import { overlay, sheet, lightbox, toast } from '../ui/overlays.js';
-import { copyText, fmtDate } from '../ui/platform.js';
+import { copyText, fmtDate, saveFile } from '../ui/platform.js';
 import { backBtn } from '../ui/components.js';
 
 let wakeLock = null;
@@ -27,6 +28,8 @@ export function viewDetail(n) {
   const moreBtn = h('button', { class: 'icon-btn', 'aria-label': 'Más', onclick: () => sheet(n.titulo, [
     ['✨  Editar con una IA', () => askAI(n)],
     ['📤  Compartir / copiar texto', () => shareNote(n)],
+    ['📋  Copiar como Markdown', async () => toast((await copyText(toMarkdown(n))) ? 'Markdown copiado' : 'No se pudo copiar')],
+    ['⬇️  Descargar .md', () => saveFile(fileName(n), new Blob([toMarkdown(n)], { type: 'text/markdown' }))],
     ['⧉  Duplicar', () => duplicate(n)],
     ['🗑  Eliminar', () => removeNote(n), 'danger'],
   ]) }, '⋯');
@@ -79,6 +82,8 @@ export function viewDetail(n) {
   onLeave(() => { if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; } });
   return view;
 }
+
+const fileName = (n) => (n.titulo.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'nota') + '.md';
 
 async function shareNote(n) {
   const text = toPlainText(n);

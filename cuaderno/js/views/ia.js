@@ -33,7 +33,14 @@ export function viewIA() {
     h('button', { class: 'btn', disabled: !state.notas.length, onclick: async () => toast((await copyText(promptEdit(state.notas, ''))) ? `Copiadas ${state.notas.length} notas` : 'No se pudo copiar') }, '📋 Copiar todo el cuaderno')));
 
   // 3) paste back
-  const box = h('textarea', { class: 'input', rows: 5, placeholder: 'Pegá acá la respuesta de la IA (el bloque JSON)' });
+  const box = h('textarea', { class: 'input', rows: 5, placeholder: 'Pegá acá la respuesta de la IA (markdown), o elegí el archivo .md que te dio' });
+  const fileInput = h('input', { type: 'file', accept: '.md,.markdown,.txt,.json,text/*,application/json', multiple: true, hidden: true, onchange: async () => {
+    const files = [...fileInput.files];
+    fileInput.value = '';
+    if (!files.length) return;
+    box.value = (await Promise.all(files.map((f) => f.text()))).join('\n\n');
+    review();
+  } });
   const out = h('div', { hidden: true });
   const reviewBtn = h('button', { class: 'btn primary', onclick: review }, 'Revisar');
   let parsed = null;
@@ -71,7 +78,8 @@ export function viewIA() {
       navigator.clipboard && navigator.clipboard.readText && h('button', { class: 'btn', onclick: async () => {
         try { box.value = await navigator.clipboard.readText(); review(); } catch (e) { box.focus(); toast('Pegá manualmente en el cuadro'); }
       } }, '📥 Pegar'),
-      reviewBtn),
+      h('button', { class: 'btn', onclick: () => fileInput.click() }, '📂 Archivo .md'),
+      reviewBtn, fileInput),
     out));
   return view;
 }

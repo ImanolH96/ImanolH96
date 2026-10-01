@@ -4,7 +4,7 @@ import { go } from '../core/router.js';
 import { state, persist } from '../core/store.js';
 import { clearImages } from '../data/images.js';
 import { parsePayload, planImport, applyImport } from '../data/ai.js';
-import { exportBackup } from '../data/backup.js';
+import { exportBackup, exportMarkdown } from '../data/backup.js';
 import { sheet, toast } from '../ui/overlays.js';
 import { fmtDate } from '../ui/platform.js';
 import { appbar, backBtn } from '../ui/components.js';
@@ -12,12 +12,12 @@ import { appbar, backBtn } from '../ui/components.js';
 export function viewSettings() {
   const view = h('div', { class: 'view' }, appbar('Ajustes', backBtn()));
   const lastBackup = h('p', {}, `Última copia: ${fmtDate(state.meta.lastBackup)}`);
-  const importInput = h('input', { type: 'file', accept: 'application/json,.json,text/plain', hidden: true, onchange: async () => {
-    const file = importInput.files[0];
+  const importInput = h('input', { type: 'file', accept: '.md,.markdown,.txt,.json,text/*,application/json', multiple: true, hidden: true, onchange: async () => {
+    const files = [...importInput.files];
     importInput.value = '';
-    if (!file) return;
+    if (!files.length) return;
     try {
-      const parsed = parsePayload(await file.text());
+      const parsed = parsePayload((await Promise.all(files.map((f) => f.text()))).join('\n\n'));
       const plan = planImport(parsed.notas);
       sheet(`Importar ${parsed.notas.length} nota(s): ${plan.nuevos.length} nueva(s), ${plan.actualizados.length} reemplazan las actuales`, [
         ['Importar', async () => { await applyImport(parsed); toast('Importado'); go('#/', true); }, 'primary'],
@@ -38,7 +38,8 @@ export function viewSettings() {
       h('p', {}, 'Todo vive solo en este dispositivo (texto y fotos). Guardá una copia de vez en cuando: si borrás los datos del navegador o cambiás de teléfono, es lo único que te salva.'),
       lastBackup, stale && state.notas.length > 0 && h('p', { style: 'color:var(--danger);font-weight:600' }, 'Hace tiempo que no hacés una copia.'),
       h('button', { class: 'btn primary', onclick: async () => { if (await exportBackup()) { lastBackup.textContent = `Última copia: ${fmtDate(state.meta.lastBackup)}`; toast('Copia lista'); } } }, '💾 Guardar copia (.json con fotos)'),
-      h('button', { class: 'btn', onclick: () => importInput.click() }, '📂 Importar copia o JSON'),
+      h('button', { class: 'btn', onclick: () => importInput.click() }, '📂 Importar copia (.json) o notas (.md)'),
+      h('button', { class: 'btn', disabled: !state.notas.length, onclick: async () => { if (await exportMarkdown()) toast('Markdown listo'); } }, '📝 Exportar todo como Markdown (sin fotos)'),
       importInput, storageLine),
     h('div', { class: 'panel' },
       h('h3', {}, 'Instalar en el iPhone'),

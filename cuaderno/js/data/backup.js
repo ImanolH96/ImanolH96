@@ -2,6 +2,7 @@ import { APP_VERSION } from '../config.js';
 import { state, persist } from '../core/store.js';
 import { imgGet, blobToDataURL } from './images.js';
 import { saveFile } from '../ui/platform.js';
+import { toMarkdownAll } from './markdown.js';
 
 export async function exportBackup() {
   const imagenesData = {};
@@ -19,4 +20,10 @@ export async function exportBackup() {
     persist();
   }
   return ok;
+}
+
+// All notes as one readable .md file (no photos): edit it anywhere, or hand it to an AI.
+export function exportMarkdown() {
+  const stamp = new Date().toISOString().slice(0, 10);
+  return saveFile(`cuaderno-${stamp}.md`, new Blob([toMarkdownAll(state.notas)], { type: 'text/markdown' }));
 }
