@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '66';
+const APP_VERSION = '67';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -44,6 +44,7 @@ function load() {
   data = data || { settings: { quota: 2, weekStart: 1 }, entries: [] };
   data.alloc = data.alloc || {}; // playground: thirds assigned per week { 'YYYY-MM-DD' (week start): thirds }
   data.plans = data.plans || []; // planned free meals: birthdays, events… { id, fecha, momento, nombre, valor (thirds) }
+  data.notes = data.notes || {}; // notes for the nutritionist, per cycle/month: { 'YYYY-MM-DD' (period start): text }
   data.settings.ranges = { ...DEFAULT_RANGES, ...data.settings.ranges };
   // Entries from before partial counting were full free meals.
   for (const e of data.entries) {
@@ -951,7 +952,7 @@ function renderToday() {
   for (const e of day) list.appendChild(entryRow(e, `${e.momento}, ${e.hora}`));
 }
 
-// ---------- summary for the nutritionist: one cycle (or month) at a glance, shareable as text ----------
+// ---------- summary for the nutritionist: one cycle (or month) at a glance, shareable as an image or text ----------
 
 function periodSummary(y, m) {
   const span = monthSpan(y, m);
@@ -975,7 +976,53 @@ function periodSummary(y, m) {
   const byDay = tally((e) => parseDate(e.fecha).toLocaleDateString('es', { weekday: 'long' }));
   const joy = JOY.map(([v, face, label]) => ({ face, label, list: entries.filter((e) => joyOf(e.disfrute)?.[0] === v) }));
   const inCourse = today >= span.from && today <= span.to;
-  return { span, quota, total, allowed: monthAllowance(y, m), weeks, kinds, byMeal, byDay, joy, inCourse, title: periodTitle(y, m) };
+  // average per week over the weeks that have started (the current one included)
+  const avg = weeks.length ? total / weeks.length : 0;
+  return { y, m, span, quota, total, allowed: monthAllowance(y, m), weeks, kinds, byMeal, byDay, joy, inCourse, avg, title: periodTitle(y, m) };
+}
+
+// the period before (y, m), or null when it's before the plan / the first entry
+function prevPeriod(y, m) {
+  const d = new Date(y, m - 1, 1);
+  const first = state.settings.cycleStart
+    || state.entries.reduce((a, e) => (e.fecha < a ? e.fecha : a), '9999');
+  return monthSpan(d.getFullYear(), d.getMonth()).to >= first ? d : null;
+}
+
+// up to the last 6 periods ending at (y, m): [{ label, total, allowed, avg, current }]
+function periodTrend(y, m) {
+  const out = [];
+  let d = new Date(y, m, 1);
+  for (let i = 0; i < 6 && d; i++) {
+    const S = periodSummary(d.getFullYear(), d.getMonth());
+    const label = state.settings.cycleStart
+      ? `C${cycleIndex(d.getFullYear(), d.getMonth()) + 1}`
+      : MONTH(d).slice(0, 3);
+    out.unshift({ label, total: S.total, allowed: S.allowed, avg: S.avg, current: i === 0 });
+    d = prevPeriod(d.getFullYear(), d.getMonth());
+  }
+  return out;
+}
+
+// average per week, in the current unit, with one decimal: "1,2" comidas libres or "3,5" porciones
+const fmtAvg = (thirds) => (inPorciones() ? thirds : thirds / 3).toLocaleString('es', { maximumFractionDigits: 1 });
+// singular when the average is exactly 1: "1 comida libre por semana"
+const avgUnit = (thirds) => {
+  const one = fmtAvg(thirds) === '1';
+  return inPorciones() ? `${one ? 'porción' : 'porciones'} por semana` : `${one ? 'comida libre' : 'comidas libres'} por semana`;
+};
+const periodWord = () => (state.settings.cycleStart ? 'ciclo' : 'mes');
+
+// "↓ menos que el ciclo anterior (1,5)" — compares the weekly average, fair even mid-cycle
+function compareLine(S) {
+  const p = prevPeriod(S.y, S.m);
+  if (!p) return null;
+  const P = periodSummary(p.getFullYear(), p.getMonth());
+  const a = Math.round(S.avg * 10), b = Math.round(P.avg * 10);
+  const dir = a < b ? 'down' : a > b ? 'up' : 'same';
+  const text = dir === 'same' ? `igual que el ${periodWord()} anterior`
+    : `${dir === 'down' ? '↓ menos' : '↑ más'} que el ${periodWord()} anterior (${fmtAvg(P.avg)})`;
+  return { dir, text, prev: P };
 }
 
 // "sobre todo en la cena (4 de 6)" — only when one meal or day clearly stands out
@@ -1002,7 +1049,10 @@ function summaryLines(S) {
 
 function summaryText(S) {
   const L = summaryLines(S);
-  const out = [`🍽️ Comidas libres · ${L.head}`, `Total: ${L.total}${L.course ? ` (${L.course.charAt(0).toLowerCase() + L.course.slice(1)})` : ''}`, '', 'Semanas:'];
+  const out = [`🍽️ Comidas libres · ${L.head}`, `Total: ${L.total}${L.course ? ` (${L.course.charAt(0).toLowerCase() + L.course.slice(1)})` : ''}`];
+  const cmp = compareLine(S);
+  out.push(`Promedio: ${fmtAvg(S.avg)} ${avgUnit(S.avg)} (cupo ${quotaN(S.quota)})${cmp ? `, ${cmp.text}` : ''}`);
+  out.push('', 'Semanas:');
   for (const w of S.weeks) out.push(`${w.st.icon} ${weekRangeLabel(w.from, w.to, true)}: ${fmtThirds(w.used)} de ${quotaN(S.quota)}`);
   if (S.kinds.length) out.push('', `Qué fue: ${S.kinds.map((k) => `${k.icon} ${k.label.split(' ')[0].toLowerCase()} ${k.n}`).join(' · ')}`);
   if (L.when) out.push(`Cuándo: ${L.when}`);
@@ -1012,6 +1062,8 @@ function summaryText(S) {
     const meh = S.joy[0].list.map((e) => e.descripcion).filter(Boolean);
     if (meh.length) out.push(`No valieron tanto: ${meh.join(', ')}`);
   }
+  const note = (state.notes[S.span.from] || '').trim();
+  if (note) out.push('', `Notas: ${note}`);
   return out.join('\n');
 }
 
@@ -1028,6 +1080,31 @@ function openSummary() {
   top.append(el('b', 'sum-total', fmtThirds(S.total)), el('span', '', ` de ${allowanceWord(S.allowed)}`));
   box.append(top);
   if (L.course) box.append(el('p', 'sum-note', L.course));
+
+  const avg = el('div', 'sum-avg');
+  avg.append(el('b', '', fmtAvg(S.avg)), el('span', '', ` ${avgUnit(S.avg)} en promedio · cupo ${quotaN(S.quota)}`));
+  box.append(avg);
+  const cmp = compareLine(S);
+  if (cmp) box.append(el('p', `sum-cmp ${cmp.dir}`, cmp.text.charAt(0).toUpperCase() + cmp.text.slice(1)));
+  const trend = periodTrend(S.y, S.m);
+  if (trend.length > 1) {
+    box.append(el('h4', '', `Últimos ${trend.length} ${state.settings.cycleStart ? 'ciclos' : 'meses'}`));
+    const tr = el('div', 'sum-trend');
+    const max = Math.max(...trend.map((t) => Math.max(t.total, t.allowed)), 1);
+    for (const t of trend) {
+      const col = el('div', 'tcol' + (t.current ? ' cur' : '') + (t.total > t.allowed ? ' over' : ''));
+      const bar = el('div', 'tbar');
+      const fill = el('i');
+      fill.style.height = `${(t.total / max) * 100}%`;
+      const lim = el('i', 'tlim');
+      lim.style.bottom = `${(t.allowed / max) * 100}%`;
+      bar.append(fill, lim);
+      col.append(el('b', '', fmtThirds(t.total)), bar, el('small', '', t.current && S.inCourse ? `${t.label} · en curso` : t.label));
+      col.setAttribute('aria-label', `${t.label}: ${fmtThirds(t.total)} de ${fmtThirds(t.allowed)}`);
+      tr.append(col);
+    }
+    box.append(tr);
+  }
 
   box.append(el('h4', '', 'Semanas'));
   const wl = el('ul', 'sum-weeks');
@@ -1070,17 +1147,205 @@ function openSummary() {
   } else {
     box.append(el('p', 'sum-note', 'Todavía no calificaste ninguna. Podés hacerlo al sumar o desde el detalle de cada registro.'));
   }
+
+  box.append(el('h4', '', 'Notas para la consulta'));
+  const ta = Object.assign(el('textarea', 'sum-notes'), { placeholder: 'Dudas o cosas para comentar, ej. "preguntar por el alcohol los findes"', value: state.notes[S.span.from] || '' });
+  ta.setAttribute('aria-label', 'Notas para la consulta');
+  let saveTimer = 0;
+  ta.oninput = () => {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      const v = ta.value.trim();
+      if (v) state.notes[S.span.from] = ta.value; else delete state.notes[S.span.from];
+      persist();
+    }, 400);
+  };
+  box.append(ta);
   openSheet('summarySheet');
 }
 
 $('btnSummary').onclick = openSummary;
+// flush a pending note before sharing
+function flushSummaryNote() {
+  const ta = $('summaryBody').querySelector('.sum-notes');
+  if (!ta) return;
+  const key = monthSpan(summaryRef.getFullYear(), summaryRef.getMonth()).from;
+  if (ta.value.trim()) state.notes[key] = ta.value; else delete state.notes[key];
+  persist();
+}
+
+async function shareFile(file, fallbackName) {
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file] }); return true; } catch (err) { if (err.name === 'AbortError') return true; }
+  }
+  const url = URL.createObjectURL(file);
+  const a = Object.assign(document.createElement('a'), { href: url, download: fallbackName });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return true;
+}
+
 $('summaryShare').onclick = async () => {
+  flushSummaryNote();
+  const S = periodSummary(summaryRef.getFullYear(), summaryRef.getMonth());
+  try {
+    const blob = await summaryImage(S);
+    const name = `resumen-${S.span.from}.png`;
+    await shareFile(new File([blob], name, { type: 'image/png' }), name);
+  } catch (e) {
+    toast('No se pudo armar la imagen; probá con "Compartir texto"');
+  }
+};
+$('summaryShareText').onclick = async () => {
+  flushSummaryNote();
   const text = summaryText(periodSummary(summaryRef.getFullYear(), summaryRef.getMonth()));
   if (navigator.share) {
     try { await navigator.share({ text }); return; } catch (err) { if (err.name === 'AbortError') return; }
   }
   try { await navigator.clipboard.writeText(text); toast('Resumen copiado'); } catch { toast('No se pudo compartir'); }
 };
+
+// The summary as a PNG card, drawn on a canvas in the app's own look (fonts, colors, plates).
+async function summaryImage(S) {
+  const css = getComputedStyle(document.documentElement);
+  const C = (v) => css.getPropertyValue(v).trim();
+  const font = C('--font') || 'sans-serif';
+  try { await Promise.all(['400', '600', '800'].map((w) => document.fonts.load(`${w} 20px ${font}`))); } catch (e) { /* system font */ }
+  const L = summaryLines(S);
+  const cmp = compareLine(S);
+  const trend = periodTrend(S.y, S.m);
+  const note = (state.notes[S.span.from] || '').trim();
+  const W = 540, PAD = 28, scale = 2;
+  const cv = document.createElement('canvas');
+  cv.width = W * scale; cv.height = 2400 * scale;
+  const g = cv.getContext('2d');
+  g.scale(scale, scale);
+  const col = { ink: C('--ink'), panel: C('--panel'), line: C('--line'), paper: C('--paper'), muted: C('--muted'), good: C('--good'), over: C('--over'),
+    comida: C('--comida'), alcohol: C('--alcohol'), postre: C('--postre'), completa: C('--completa'), deep: C('--ink-deep') };
+  const txt = (t, x, yy, size, weight = 400, color = col.paper, align = 'left') => {
+    g.font = `${weight} ${size}px ${font}`; g.fillStyle = color; g.textAlign = align; g.textBaseline = 'alphabetic'; g.fillText(t, x, yy);
+    return g.measureText(t).width;
+  };
+  // split text into lines that fit maxW
+  const linesOf = (t, maxW, size, weight) => {
+    g.font = `${weight} ${size}px ${font}`;
+    const out = [];
+    for (const para of t.split('\n')) {
+      let line = '';
+      for (const w of para.split(' ')) {
+        const tryLine = line ? `${line} ${w}` : w;
+        if (g.measureText(tryLine).width > maxW && line) { out.push(line); line = w; } else line = tryLine;
+      }
+      out.push(line);
+    }
+    return out;
+  };
+  const wrap = (t, x, yy, maxW, size, lh, weight = 400, color = col.paper) => {
+    for (const l of linesOf(t, maxW, size, weight)) { txt(l, x, yy, size, weight, color); yy += lh; }
+    return yy;
+  };
+  const rrect = (x, yy, w, h, r, fill) => { g.beginPath(); g.roundRect(x, yy, w, h, r); g.fillStyle = fill; g.fill(); };
+  const plate = (cx, cy, r, kinds) => {
+    for (let i = 0; i < 3; i++) {
+      const k = kinds[i];
+      g.beginPath(); g.moveTo(cx, cy);
+      g.arc(cx, cy, r, (-90 + i * 120) * Math.PI / 180, (-90 + (i + 1) * 120) * Math.PI / 180);
+      g.closePath();
+      g.fillStyle = k ? col[k] : col.ink; g.fill();
+      g.lineWidth = 2; g.strokeStyle = col.panel; g.stroke();
+    }
+  };
+  const section = (t, yy) => { txt(t.toUpperCase(), PAD, yy, 12, 700, col.muted); return yy + 14; };
+
+  g.fillStyle = col.ink; g.fillRect(0, 0, W, cv.height);
+  let y = PAD + 14;
+  txt('🍽️  Comidas libres', PAD, y, 15, 600, col.muted); y += 34;
+  txt(L.head, PAD, y, 26, 800); y += 56;
+  const tw = txt(fmtThirds(S.total), PAD, y, 56, 800);
+  txt(` de ${allowanceWord(S.allowed)}`, PAD + tw + 4, y, 20, 600); y += 26;
+  if (L.course) { txt(L.course, PAD, y, 15, 400, col.muted); y += 22; }
+  y += 8;
+  rrect(PAD, y, W - PAD * 2, cmp ? 70 : 48, 14, col.panel);
+  const aw = txt(fmtAvg(S.avg), PAD + 16, y + 32, 26, 800);
+  txt(` ${avgUnit(S.avg)} en promedio · cupo ${quotaN(S.quota)}`, PAD + 16 + aw + 4, y + 31, 14, 600, col.paper);
+  if (cmp) txt(cmp.text.charAt(0).toUpperCase() + cmp.text.slice(1), PAD + 16, y + 56, 14, 600, cmp.dir === 'down' ? col.good : cmp.dir === 'up' ? col.over : col.muted);
+  y += (cmp ? 70 : 48) + 28;
+
+  if (trend.length > 1) {
+    y = section(`Últimos ${trend.length} ${state.settings.cycleStart ? 'ciclos' : 'meses'}`, y);
+    const max = Math.max(...trend.map((t) => Math.max(t.total, t.allowed)), 1);
+    const bw = 44, gap = Math.min(28, (W - PAD * 2 - bw * trend.length) / Math.max(trend.length - 1, 1)), bh = 80, base = y + 30 + bh;
+    trend.forEach((t, i) => {
+      const x = PAD + i * (bw + gap);
+      rrect(x, base - bh, bw, bh, 8, col.panel);
+      const h = (t.total / max) * bh;
+      if (h > 0) rrect(x, base - h, bw, h, 8, t.total > t.allowed ? col.over : t.current ? col.completa : col.good);
+      const ly = base - (t.allowed / max) * bh;
+      g.fillStyle = col.paper; g.fillRect(x - 3, ly - 1, bw + 6, 2);
+      let vy = base - h - 8;
+      if (Math.abs(vy - 4 - ly) < 12) vy = ly - 8; // don't sit on the limit line
+      txt(fmtThirds(t.total), x + bw / 2, vy, 13, 700, col.paper, 'center');
+      txt(t.label, x + bw / 2, base + 18, 12, t.current ? 700 : 400, t.current ? col.paper : col.muted, 'center');
+      if (t.current && S.inCourse) txt('en curso', x + bw / 2, base + 32, 10, 400, col.muted, 'center');
+    });
+    txt('— límite', PAD + trend.length * (bw + gap) + 4, base - bh + 4, 11, 400, col.muted);
+    y = base + 50;
+  }
+
+  y = section('Semanas', y);
+  for (const w of S.weeks) {
+    rrect(PAD, y, W - PAD * 2, 44, 12, col.panel);
+    const stc = w.st.key === 'over' ? col.over : w.st.key === 'limit' ? col.paper : col.good;
+    g.beginPath(); g.arc(PAD + 24, y + 22, 11, 0, Math.PI * 2); g.fillStyle = stc; g.fill();
+    txt(w.st.icon, PAD + 24, y + 26.5, 12, 800, col.deep, 'center');
+    txt(weekRangeLabel(w.from, w.to, true), PAD + 46, y + 27, 15, 600);
+    const plates = Math.max(S.quota / 3, Math.ceil(w.slices.length / 3));
+    let px = W - PAD - 70 - plates * 30;
+    for (let k = 0; k < plates; k++) { plate(px + 12, y + 22, 12, w.slices.slice(k * 3, k * 3 + 3)); px += 30; }
+    txt(`${fmtThirds(w.used)} / ${quotaN(S.quota)}`, W - PAD - 14, y + 27, 15, 700, col.paper, 'right');
+    y += 52;
+  }
+  y += 20;
+
+  const tiles = (items, yy) => {
+    const n = items.length, gap = 8, tw2 = (W - PAD * 2 - gap * (n - 1)) / n;
+    items.forEach((it, i) => {
+      const x = PAD + i * (tw2 + gap);
+      rrect(x, yy, tw2, 78, 12, col.panel);
+      txt(it.icon, x + tw2 / 2, yy + 30, 22, 400, col.paper, 'center');
+      txt(String(it.n), x + tw2 / 2, yy + 54, 18, 800, col.paper, 'center');
+      txt(it.label, x + tw2 / 2, yy + 70, 11, 400, col.muted, 'center');
+    });
+    return yy + 78;
+  };
+  if (S.kinds.length) {
+    y = section('Qué fue', y);
+    y = tiles(S.kinds.map((k) => ({ icon: k.icon, n: k.n, label: k.label.split(' ')[0] })), y) + 14;
+    if (L.when) y = wrap(L.when.charAt(0).toUpperCase() + L.when.slice(1), PAD, y + 8, W - PAD * 2, 15, 21, 600) + 10;
+  }
+  if (S.joy.some((j) => j.list.length)) {
+    y = section('¿Valió la pena?', y + 6);
+    y = tiles(S.joy.map((j) => ({ icon: j.face, n: j.list.length, label: j.label })), y) + 14;
+    const meh = S.joy[0].list.map((e) => e.descripcion).filter(Boolean);
+    if (meh.length) y = wrap(`No valieron tanto: ${meh.join(', ')}`, PAD, y + 8, W - PAD * 2, 15, 21, 600) + 10;
+  }
+  if (note) {
+    y = section('Notas para la consulta', y + 6) + 8;
+    const lines = linesOf(note, W - PAD * 2 - 32, 15, 400);
+    const h = 18 + lines.length * 22;
+    rrect(PAD, y, W - PAD * 2, h, 14, col.paper);
+    lines.forEach((l, i) => txt(l, PAD + 16, y + 28 + i * 22, 15, 400, col.deep));
+    y += h + 16;
+  }
+  y += 10;
+  txt('Comidas libres · tu registro del plan', W / 2, y + 10, 11, 400, col.muted, 'center');
+  y += 28;
+
+  const out = document.createElement('canvas');
+  out.width = W * scale; out.height = Math.ceil(y * scale);
+  out.getContext('2d').drawImage(cv, 0, 0);
+  return new Promise((ok, ko) => out.toBlob((b) => (b ? ok(b) : ko(new Error('toBlob'))), 'image/png'));
+}
 
 // ---------- tabs ----------
 
@@ -1872,6 +2137,11 @@ async function exportXlsx() {
     'Fecha': p.fecha, 'Momento': p.momento, 'Evento': p.nombre, 'Valor (comidas libres)': Math.round((p.valor / 3) * 100) / 100,
   })), { header: ['Fecha', 'Momento', 'Evento', 'Valor (comidas libres)'] });
   XLSX.utils.book_append_sheet(wb, ws4, 'Planificados');
+  const notes = Object.entries(state.notes || {}).filter(([, t]) => t.trim()).sort(([a], [b]) => a.localeCompare(b));
+  if (notes.length) {
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(notes.map(([from, t]) => ({ 'Desde': from, 'Notas para la consulta': t })),
+      { header: ['Desde', 'Notas para la consulta'] }), 'Notas');
+  }
   const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
   const name = `comidas-libres-${isoDate(new Date())}.xlsx`;
   const type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
