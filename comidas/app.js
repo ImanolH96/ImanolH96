@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '67';
+const APP_VERSION = '68';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -313,6 +313,7 @@ function tap(part) {
   const occ = occasion(fecha, momento, whole);
   const before = snapshot();
   const undo = () => {
+    cancelAskWhat();
     state.entries = JSON.parse(before);
     persist();
     render();
@@ -351,7 +352,8 @@ function tap(part) {
   freshWedges = added;
   hurt(added, document.querySelector(`.key[data-part="${part}"]`), whole);
   if (weekOffsetOf(fecha) !== weekOffset) goWeek(weekOffsetOf(fecha)); else render();
-  toast(`${noun} ${fem ? 'sumada' : 'sumado'} a ${where}`.replace(' a el ', ' al '), undo, target.id);
+  const asking = askWhatSoon(target.id);
+  toast(`${noun} ${fem ? 'sumada' : 'sumado'} a ${where}`.replace(' a el ', ' al '), undo, asking ? null : target.id);
 }
 
 // a haptic tick: Android has vibrate(); iOS Safari (18+) has no API, but toggling a native
@@ -937,6 +939,7 @@ function renderToday() {
   box.setAttribute('aria-label', `Esta semana: ${said}, usaste ${fmtThirds(used)}. ${notes.join('. ')} ${st.label}. Ver semana`);
 
   renderTodayPlans();
+  renderWhatNudge();
   renderBackup();
   const fecha = currentDate();
   const list = $('dayList');
@@ -1952,11 +1955,13 @@ function renderSoundSettings() {
   let custom = null;
   try { custom = localStorage.getItem(SOUND_KEY); } catch (e) { /* storage blocked */ }
   $('sSound').checked = state.settings.sound !== false;
+  $('sAskWhat').checked = state.settings.askWhat !== false;
   $('sSoundReset').hidden = !custom;
   $('sSoundNote').textContent = custom
     ? 'Suena tu audio, también con el iPhone en silencio (usa el volumen multimedia).'
     : 'Suena el "Faaa" de la app (más largo en la comida completa), también con el iPhone en silencio.';
 }
+$('sAskWhat').onchange = () => { state.settings.askWhat = $('sAskWhat').checked; persist(); };
 $('sSound').onchange = () => { state.settings.sound = $('sSound').checked; persist(); renderSoundSettings(); };
 $('sSoundTest').onclick = () => { const was = state.settings.sound; state.settings.sound = true; sound.play(); state.settings.sound = was; };
 $('sSoundPick').onclick = () => $('soundInput').click();
@@ -2167,6 +2172,155 @@ async function exportXlsx() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   markExported();
 }
+
+// ---------- "¿Qué fue?": a quick description right after logging, and a nudge for the ones left blank ----------
+// Logging never waits for it: the entry is saved on the tap, and this sheet opens on its own a moment
+// after the last tap (so adding comida + alcohol in a row isn't interrupted). Recent descriptions are one
+// tap away, and "¿Valió la pena?" lives here too. Ajustes can turn the automatic question off.
+
+const ASK_DELAY = 1500;
+const WHAT_DAYS = 7; // the nudge looks back this many days
+let askTimer = 0;
+let whatQueue = null; // when completing from the nudge: the remaining ids, in order
+let whatId = null;
+let whatJoy = 0;
+const isBlank = (e) => !(e.descripcion || '').trim() && !(e.notas || '').trim();
+
+function askWhatSoon(id) {
+  clearTimeout(askTimer);
+  if (state.settings.askWhat === false) return false;
+  const e = state.entries.find((x) => x.id === id);
+  if (!e || !isBlank(e)) return false;
+  askTimer = setTimeout(() => {
+    const cur = state.entries.find((x) => x.id === id);
+    // gone (undone / taken out), already described, or something else is open: don't ask
+    if (!cur || !isBlank(cur) || document.querySelector('.scrim:not([hidden])') || currentTab !== 'hoy') return;
+    whatQueue = null;
+    openWhat(id);
+  }, ASK_DELAY);
+  return true;
+}
+function cancelAskWhat() { clearTimeout(askTimer); }
+
+// unique recent descriptions, newest first
+function recentWhats(limit = 6) {
+  const seen = new Set(), out = [];
+  const sorted = [...state.entries].sort((a, b) => (b.fecha + b.hora).localeCompare(a.fecha + a.hora));
+  for (const e of sorted) {
+    const d = (e.descripcion || '').trim();
+    const k = d.toLowerCase();
+    if (d && !seen.has(k)) { seen.add(k); out.push(d); if (out.length === limit) break; }
+  }
+  return out;
+}
+
+function partsLine(e) {
+  return e.completa ? '🍽️ comida libre completa' : PARTS.filter(([k]) => e.partes[k]).map(([, l, i]) => `${i} ${l.split(' ')[0].toLowerCase()}`).join(' + ');
+}
+
+function openWhat(id) {
+  const e = state.entries.find((x) => x.id === id);
+  if (!e) return;
+  whatId = id;
+  whatJoy = joyOf(e.disfrute)?.[0] || 0;
+  $('whatTitle').textContent = '¿Qué fue?';
+  const pos = whatQueue ? ` · ${whatQueue.done + 1} de ${whatQueue.total}` : '';
+  $('whatSub').textContent = `${e.momento} ${dayLabel(e.fecha)} · ${partsLine(e)}${pos}`;
+  $('whatInput').value = e.descripcion || '';
+  const rec = $('whatRecent');
+  rec.innerHTML = '';
+  for (const d of recentWhats()) {
+    const b = Object.assign(document.createElement('button'), { type: 'button', textContent: d });
+    b.onclick = () => saveWhat(d); // one tap: saved
+    rec.append(b);
+  }
+  $('whatRecentWrap').hidden = !rec.childElementCount;
+  renderWhatJoy();
+  $('toast').classList.remove('show');
+  openSheet('whatSheet');
+}
+
+function renderWhatJoy() {
+  const box = $('whatJoy');
+  box.innerHTML = '';
+  for (const [v, face, label] of JOY) {
+    const b = Object.assign(document.createElement('button'), { type: 'button' });
+    b.append(Object.assign(document.createElement('span'), { className: 'face', textContent: face, ariaHidden: 'true' }), label);
+    b.setAttribute('aria-pressed', String(whatJoy === v));
+    b.onclick = () => {
+      whatJoy = whatJoy === v ? 0 : v;
+      renderWhatJoy();
+      const e = state.entries.find((x) => x.id === whatId);
+      if (e) { e.disfrute = whatJoy; persist(); } // kept even if you then tap "Después"
+    };
+    box.append(b);
+  }
+}
+
+function saveWhat(text) {
+  const e = state.entries.find((x) => x.id === whatId);
+  const t = (text ?? $('whatInput').value).trim();
+  if (e && t) {
+    e.descripcion = t;
+    e.disfrute = whatJoy;
+    persist();
+  }
+  nextWhat(!!t);
+}
+
+// close, or move on to the next blank one when completing from the nudge
+function nextWhat(saved) {
+  closeSheet('whatSheet');
+  $('whatInput').blur();
+  if (whatQueue) {
+    whatQueue.done++;
+    whatQueue.ids = whatQueue.ids.filter((id) => id !== whatId);
+    const next = whatQueue.ids.find((id) => { const e = state.entries.find((x) => x.id === id); return e && isBlank(e); });
+    render();
+    if (next) { openWhat(next); return; }
+    whatQueue = null;
+    toast(saved ? 'Listo, todo completo' : 'Listo');
+    return;
+  }
+  render();
+  if (saved) toast('Anotado');
+}
+
+$('whatForm').addEventListener('submit', (ev) => { ev.preventDefault(); saveWhat(); });
+$('whatSkip').onclick = () => nextWhat(false);
+
+// ---- the nudge on Registrar ----
+function blankWhats() {
+  const today = isoDate(new Date());
+  const from = new Date(); from.setDate(from.getDate() - (WHAT_DAYS - 1));
+  const f = isoDate(from);
+  return state.entries.filter((e) => e.fecha >= f && e.fecha <= today && isBlank(e))
+    .sort((a, b) => (b.fecha + b.hora).localeCompare(a.fecha + a.hora));
+}
+function renderWhatNudge() {
+  const box = $('whatNudge');
+  const today = isoDate(new Date());
+  const list = blankWhats();
+  box.hidden = !list.length || state.settings.whatSnooze === today;
+  if (box.hidden) return;
+  const n = list.length;
+  const allToday = list.every((e) => e.fecha === today);
+  box.querySelector('b').textContent = allToday
+    ? (n === 1 ? 'Hoy registraste una comida libre y no le pusiste qué fue' : `Hoy registraste ${n} comidas libres sin decir qué fueron`)
+    : (n === 1 ? `Te quedó una comida ${dayLabel(list[0].fecha)} sin decir qué fue` : `Tenés ${n} comidas de estos días sin decir qué fueron`);
+  box.querySelector('small').textContent = n === 1 ? 'Te lleva dos segundos.' : 'Te las muestro una por una.';
+}
+$('whatGo').onclick = () => {
+  const ids = blankWhats().map((e) => e.id);
+  if (!ids.length) return;
+  whatQueue = { ids, done: 0, total: ids.length };
+  openWhat(ids[0]);
+};
+$('whatLater').onclick = () => {
+  state.settings.whatSnooze = isoDate(new Date()); // back tomorrow
+  persist();
+  renderWhatNudge();
+};
 
 // ---------- backup nudge: the data only lives on this phone, so ask for a copy every 4 weeks ----------
 

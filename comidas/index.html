@@ -566,6 +566,16 @@
   .backup-text b { font-size: 14px; font-weight: 700; }
   .backup-text small { font-size: 13px; color: var(--muted); }
   .backup-go { flex: none; border: 0; border-radius: 10px; background: var(--paper); color: var(--ink-deep); font-weight: 800; padding: 8px 12px; }
+  .what-nudge { border-color: var(--completa); border-style: solid; }
+  .what-nudge .backup-go { background: var(--completa); }
+  .what-sub { margin: 4px 0 0; font-size: 14px; color: var(--muted); }
+  #whatInput { font-size: 17px; }
+  .what-recent-wrap { display: flex; flex-direction: column; gap: 6px; margin-top: -4px; }
+  .what-recent-wrap small { font-size: 12.5px; color: var(--muted); }
+  .what-recent { display: flex; flex-wrap: wrap; gap: 6px; }
+  .what-recent button { border: 1.5px solid var(--line); background: var(--ink); color: var(--paper); border-radius: 999px; padding: 7px 12px;
+    font-size: 14px; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .what-recent button:active { background: var(--completa); color: var(--ink-deep); border-color: var(--completa); }
   .backup-x { flex: none; border: 0; background: none; color: var(--muted); font-size: 16px; width: 36px; height: 36px; border-radius: 10px; }
   .today-plans { display: flex; flex-direction: column; gap: 8px; margin-top: -12px; }
   .tplan { display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -624,6 +634,11 @@
   <div class="tab" id="tab-hoy" role="tabpanel" aria-labelledby="tb-hoy">
     <button class="today-sum" id="todaySummary" type="button"></button>
     <div class="today-plans" id="todayPlans" hidden></div>
+    <div class="backup what-nudge" id="whatNudge" role="status" hidden>
+      <span class="backup-text"><b></b><small></small></span>
+      <button class="backup-go" id="whatGo" type="button">Completar</button>
+      <button class="backup-x" id="whatLater" type="button" aria-label="Recordarme mañana">✕</button>
+    </div>
     <div class="backup" id="backupNudge" role="status" hidden>
       <span class="backup-text"><b></b><small>Guardá un Excel en Archivos por si se borran.</small></span>
       <button class="backup-go" id="backupExport" type="button">Exportar</button>
@@ -886,6 +901,26 @@
 </div>
 
 <!-- settings -->
+<!-- "¿Qué fue?": opens on its own a moment after logging -->
+<div class="scrim" id="whatSheet" hidden>
+  <form class="sheet" id="whatForm" autocomplete="off" role="dialog" aria-modal="true" aria-labelledby="whatTitle">
+    <div>
+      <h3 id="whatTitle">¿Qué fue?</h3>
+      <p class="what-sub" id="whatSub"></p>
+    </div>
+    <input id="whatInput" placeholder="Ej: pizza con amigos" enterkeyhint="done" autocapitalize="sentences" aria-label="Qué fue">
+    <div class="what-recent-wrap" id="whatRecentWrap">
+      <small>Tocá una para usarla</small>
+      <div class="what-recent" id="whatRecent"></div>
+    </div>
+    <div class="field"><span>¿Valió la pena? (opcional)</span><div class="joy-pick" id="whatJoy"></div></div>
+    <div class="actions">
+      <button class="solid" type="submit">Listo</button>
+      <button class="link" type="button" id="whatSkip">Después</button>
+    </div>
+  </form>
+</div>
+
 <div class="scrim" id="summarySheet" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="summaryTitle">
     <h3 id="summaryTitle">Resumen</h3>
@@ -924,6 +959,7 @@
     <div class="actions">
       <button class="solid" type="button" id="btnSaveSettings">Guardar ajustes</button>
     </div>
+    <label class="check"><input type="checkbox" id="sAskWhat"> Preguntar "¿Qué fue?" al sumar</label>
     <p>Sonido al sumar</p>
     <div class="sound-row">
       <label class="check"><input type="checkbox" id="sSound"> Sonar "Faaa" al sumar</label>
