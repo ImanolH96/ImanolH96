@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '68';
+const APP_VERSION = '69';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -1860,6 +1860,19 @@ function render() {
 
 function openSheet(id) { $(id).hidden = false; }
 function closeSheet(id) { $(id).hidden = true; }
+
+// every sheet gets a ✕ in its top-right corner (it stays put while a long sheet scrolls)
+for (const scrim of document.querySelectorAll('.scrim')) {
+  const sheet = scrim.querySelector('.sheet');
+  const x = Object.assign(document.createElement('button'), { type: 'button', className: 'sheet-x', innerHTML: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>' });
+  x.setAttribute('aria-label', 'Cerrar');
+  x.onclick = () => {
+    if (scrim.id === 'dialog') { $('dialogActions').querySelector('.link')?.click(); return; } // = Cancelar
+    if (scrim.id === 'whatSheet') { whatQueue = null; closeSheet('whatSheet'); render(); return; }
+    closeSheet(scrim.id);
+  };
+  sheet.prepend(x);
+}
 for (const scrim of document.querySelectorAll('.scrim')) {
   scrim.addEventListener('click', (ev) => {
     if (ev.target === scrim && scrim.id !== 'dialog') closeSheet(scrim.id);

@@ -439,6 +439,11 @@
   }
   @keyframes rise { from { transform: translateY(40%); opacity: 0; } }
   .sheet h3 { margin: 0; font-size: 20px; font-weight: 700; }
+  .sheet h3 { padding-right: 44px; }
+  .sheet-x { position: sticky; top: 0; z-index: 2; align-self: flex-end; flex: none; margin: -6px -4px -48px 0;
+    width: 36px; height: 36px; border: 0; border-radius: 50%; display: grid; place-items: center;
+    background: var(--ink); color: var(--muted); }
+  .sheet-x:active { color: var(--paper); }
   .sheet p { margin: 0; color: var(--muted); }
   .field { display: flex; flex-direction: column; gap: 6px; }
   .field > span { font-size: 14px; color: var(--muted); }
