@@ -578,6 +578,8 @@
   .what-sub { margin: 4px 0 0; font-size: 14px; color: var(--muted); }
   .kcal-row { display: flex; gap: 8px; align-items: stretch; }
   .kcal-row input { flex: 1; }
+  .kcal-hint { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .kcal-hint:empty { display: none; }
   .kcal-ai { flex: none; white-space: nowrap; padding: 8px 12px; font-size: 14px; }
   .ai-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 15px; }
   .ai-open { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -875,7 +877,7 @@
     </label>
     <div class="field"><span>¿Valió la pena? (opcional)</span><div class="joy-pick" id="eJoy"></div></div>
     <label class="field"><span>Qué fue (opcional)</span><input id="eDesc" placeholder="Pizza con amigos"></label>
-    <div class="field"><span>Calorías aprox. (opcional)</span><div class="kcal-row"><input type="number" id="eKcal" min="0" max="9999" step="10" inputmode="numeric"><button class="ghost kcal-ai" type="button" data-kcal="eKcal">📷 Calcular con IA</button></div></div>
+    <div class="field"><span>Calorías aprox. (opcional)</span><div class="kcal-row"><input type="number" id="eKcal" min="0" max="9999" step="10" inputmode="numeric"><button class="ghost kcal-ai" type="button" data-kcal="eKcal">📷 Calcular con IA</button></div><small class="kcal-hint" id="eKcalHint"></small></div>
     <label class="field"><span>Notas (opcional)</span><textarea id="eNotes" placeholder="Dónde, con quién, cómo te sentiste"></textarea></label>
     <div class="actions">
       <button class="solid" type="submit">Guardar cambios</button>
@@ -931,7 +933,7 @@
       <div class="what-recent" id="whatRecent"></div>
     </div>
     <div class="field"><span>¿Valió la pena? (opcional)</span><div class="joy-pick" id="whatJoy"></div></div>
-    <div class="field"><span>Calorías aprox. (opcional)</span><div class="kcal-row"><input type="number" id="whatKcal" min="0" max="9999" step="10" inputmode="numeric" enterkeyhint="done"><button class="ghost kcal-ai" type="button" data-kcal="whatKcal">📷 Calcular con IA</button></div></div>
+    <div class="field"><span>Calorías aprox. (opcional)</span><div class="kcal-row"><input type="number" id="whatKcal" min="0" max="9999" step="10" inputmode="numeric" enterkeyhint="done"><button class="ghost kcal-ai" type="button" data-kcal="whatKcal">📷 Calcular con IA</button></div><small class="kcal-hint" id="whatKcalHint"></small></div>
     <div class="actions">
       <button class="solid" type="submit">Listo</button>
       <button class="link" type="button" id="whatSkip">Después</button>
@@ -990,6 +992,14 @@
     <label class="field"><span>Contar en</span>
       <select id="sUnits"><option value="tercios">Comidas libres (⅓, ⅔, 1…)</option><option value="porciones">Porciones enteras (1 por parte, 3 la completa)</option></select>
     </label>
+    <p>Calorías de cada comida de tu plan. Lo que cuenta es lo que te pasás: si una comida libre reemplaza una del plan, se descuentan; el alcohol o el dulce solos son todo extra.</p>
+    <div class="row">
+      <label class="field"><span>Desayuno</span><input type="number" id="sPlan-Desayuno" min="0" max="9999" step="10" inputmode="numeric" placeholder="kcal"></label>
+      <label class="field"><span>Almuerzo</span><input type="number" id="sPlan-Almuerzo" min="0" max="9999" step="10" inputmode="numeric" placeholder="kcal"></label>
+      <label class="field"><span>Merienda</span><input type="number" id="sPlan-Merienda" min="0" max="9999" step="10" inputmode="numeric" placeholder="kcal"></label>
+      <label class="field"><span>Cena</span><input type="number" id="sPlan-Cena" min="0" max="9999" step="10" inputmode="numeric" placeholder="kcal"></label>
+      <label class="field"><span>Snack</span><input type="number" id="sPlan-Snack" min="0" max="9999" step="10" inputmode="numeric" placeholder="kcal"></label>
+    </div>
     <p>Calorías aproximadas de cada parte. Se usan cuando no anotás las de un registro; podés pedirle los valores a tu nutri.</p>
     <div class="row">
       <label class="field"><span>🍔 Comida</span><input type="number" id="sKcal-comida" min="0" max="9999" step="10" inputmode="numeric"></label>

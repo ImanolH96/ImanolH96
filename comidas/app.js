@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '71';
+const APP_VERSION = '72';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -30,6 +30,8 @@ const COLUMNS = [
   ['valor', 'Valor (comidas libres)'],
   ['disfrute', 'Disfrute (1-5)'],
   ['kcal', 'Calorías (aprox.)'],
+  ['kcalPlan', 'Calorías del plan'],
+  ['kcalExtra', 'Calorías extra'],
   ['notas', 'Notas'],
   ['id', 'ID'],
 ];
@@ -114,8 +116,16 @@ function kcalEstimate(e) {
   return e.completa ? K.completa : PARTS.reduce((n, [k]) => n + (e.partes[k] ? K[k] : 0), 0);
 }
 const kcalOf = (e) => (e.kcal > 0 ? e.kcal : kcalEstimate(e));
-const kcalBetween = (from, to) => state.entries.filter((e) => e.fecha >= from && e.fecha <= to).reduce((n, e) => n + kcalOf(e), 0);
+// What counts is the extra over the plan (Ajustes → calorías de cada comida del plan). An entry with
+// comida or completa took the place of that meal, so the plan's meal is subtracted; alcohol or dulce
+// alone came on top of it, so all of it is extra.
+const planKcal = (momento) => Number((state.settings.planKcal || {})[momento]) || 0;
+const replacesMeal = (e) => !!(e.completa || e.partes.comida);
+const planOf = (e) => (replacesMeal(e) ? planKcal(e.momento) : 0);
+const extraOf = (e) => Math.max(0, kcalOf(e) - planOf(e));
+const extraBetween = (from, to) => state.entries.filter((e) => e.fecha >= from && e.fecha <= to).reduce((n, e) => n + extraOf(e), 0);
 const fmtKcal = (n) => `${Math.round(n).toLocaleString('es')} kcal`;
+const fmtExtra = (n) => `+${fmtKcal(n)} extra`;
 // typed number → whole kcal, or 0 (= use the estimate)
 const kcalInput = (v) => Math.max(0, Math.min(9999, Math.round(Number(v) || 0)));
 
@@ -774,8 +784,8 @@ function renderWeek() {
   // the thirds just added get a little stamp when you land here from the keypad
   const fresh = freshWedges ? [used - freshWedges, used] : 0;
   box.append(weekHero({ used, quota, slices, current, daysLeft, fresh }));
-  const kcal = kcalBetween(from, to);
-  if (kcal) box.append(Object.assign(document.createElement('small'), { className: 'kcal-line', textContent: `≈ ${fmtKcal(kcal)} fuera del plan` }));
+  const extra = extraBetween(from, to);
+  if (extra) box.append(Object.assign(document.createElement('small'), { className: 'kcal-line', textContent: `≈ ${fmtExtra(extra)}` }));
   freshWedges = 0;
 }
 
@@ -823,7 +833,7 @@ function entryRow(e, title) {
   const sub = document.createElement('span');
   const parts = [e.completa ? 'comida libre completa' : '', ...PARTS.filter(([k]) => e.partes[k]).map(([, l]) => l.toLowerCase())]
     .filter(Boolean).join(', ');
-  sub.textContent = `${e.descripcion || e.notas || parts.charAt(0).toUpperCase() + parts.slice(1)} · ${e.kcal > 0 ? '' : '≈ '}${fmtKcal(kcalOf(e))}`;
+  sub.textContent = `${e.descripcion || e.notas || parts.charAt(0).toUpperCase() + parts.slice(1)} · ${e.kcal > 0 ? '' : '≈ '}${fmtExtra(extraOf(e))}`;
   what.append(t, sub);
   const val = document.createElement('span');
   val.className = 'val';
@@ -949,8 +959,8 @@ function renderToday() {
   if (reserved) notes.push(inPorciones() ? `${porciones(reserved)} reservadas para eventos` : `${fmtThirds(reserved)} reservado para eventos`);
   const planned = state.alloc[from];
   if (planned) notes.push(`tu plan: ${fmtThirds(planned)} más`);
-  const kcal = kcalBetween(from, to);
-  if (kcal) notes.push(`≈ ${fmtKcal(kcal)} fuera del plan`);
+  const extra = extraBetween(from, to);
+  if (extra) notes.push(`≈ ${fmtExtra(extra)}`);
   box.append(head, hero);
   if (notes.length) {
     const note = Object.assign(document.createElement('small'), { className: 'note' });
@@ -986,10 +996,10 @@ function periodSummary(y, m) {
   const quota = (Number(state.settings.quota) || 0) * 3;
   const entries = state.entries.filter((e) => e.fecha >= span.from && e.fecha <= span.to);
   const total = entries.reduce((n, e) => n + thirdsOf(e), 0);
-  const kcal = entries.reduce((n, e) => n + kcalOf(e), 0);
+  const extra = entries.reduce((n, e) => n + extraOf(e), 0);
   const weeks = span.weeks.filter(([f]) => f <= today).map(([from, to]) => {
     const used = thirdsBetween(from, to);
-    return { from, to, used, kcal: kcalBetween(from, to), slices: weekSlices(from, to), done: to < today, st: weekStatus(used, quota, to < today) };
+    return { from, to, used, extra: extraBetween(from, to), slices: weekSlices(from, to), done: to < today, st: weekStatus(used, quota, to < today) };
   });
   const count = (fn) => entries.filter(fn).length;
   const kinds = [...PARTS.map(([k, label, icon]) => ({ icon, label, n: count((e) => e.partes[k]) })),
@@ -1005,8 +1015,8 @@ function periodSummary(y, m) {
   const inCourse = today >= span.from && today <= span.to;
   // average per week over the weeks that have started (the current one included)
   const avg = weeks.length ? total / weeks.length : 0;
-  const kcalAvg = weeks.length ? kcal / weeks.length : 0;
-  return { y, m, span, quota, total, kcal, kcalAvg, allowed: monthAllowance(y, m), weeks, kinds, byMeal, byDay, joy, inCourse, avg, title: periodTitle(y, m) };
+  const extraAvg = weeks.length ? extra / weeks.length : 0;
+  return { y, m, span, quota, total, extra, extraAvg, allowed: monthAllowance(y, m), weeks, kinds, byMeal, byDay, joy, inCourse, avg, title: periodTitle(y, m) };
 }
 
 // the period before (y, m), or null when it's before the plan / the first entry
@@ -1075,17 +1085,17 @@ function summaryLines(S) {
   };
 }
 
-// "≈ 5400 kcal en total · 1350 por semana"
-const kcalLine = (S) => `≈ ${fmtKcal(S.kcal)} en total · ${Math.round(S.kcalAvg).toLocaleString('es')} por semana`;
+// "≈ +5400 kcal extra en total · +1350 por semana"
+const kcalLine = (S) => `≈ ${fmtExtra(S.extra)} en total · +${Math.round(S.extraAvg).toLocaleString('es')} por semana`;
 
 function summaryText(S) {
   const L = summaryLines(S);
   const out = [`🍽️ Comidas libres · ${L.head}`, `Total: ${L.total}${L.course ? ` (${L.course.charAt(0).toLowerCase() + L.course.slice(1)})` : ''}`];
   const cmp = compareLine(S);
   out.push(`Promedio: ${fmtAvg(S.avg)} ${avgUnit(S.avg)} (cupo ${quotaN(S.quota)})${cmp ? `, ${cmp.text}` : ''}`);
-  if (S.kcal) out.push(`Calorías: ${kcalLine(S)}`);
+  if (S.extra) out.push(`Calorías: ${kcalLine(S)}`);
   out.push('', 'Semanas:');
-  for (const w of S.weeks) out.push(`${w.st.icon} ${weekRangeLabel(w.from, w.to, true)}: ${fmtThirds(w.used)} de ${quotaN(S.quota)}${w.kcal ? ` (≈ ${fmtKcal(w.kcal)})` : ''}`);
+  for (const w of S.weeks) out.push(`${w.st.icon} ${weekRangeLabel(w.from, w.to, true)}: ${fmtThirds(w.used)} de ${quotaN(S.quota)}${w.extra ? ` (≈ +${fmtKcal(w.extra)})` : ''}`);
   if (S.kinds.length) out.push('', `Qué fue: ${S.kinds.map((k) => `${k.icon} ${k.label.split(' ')[0].toLowerCase()} ${k.n}`).join(' · ')}`);
   if (L.when) out.push(`Cuándo: ${L.when}`);
   const rated = S.joy.filter((j) => j.list.length);
@@ -1118,7 +1128,7 @@ function openSummary() {
   box.append(avg);
   const cmp = compareLine(S);
   if (cmp) box.append(el('p', `sum-cmp ${cmp.dir}`, cmp.text.charAt(0).toUpperCase() + cmp.text.slice(1)));
-  if (S.kcal) box.append(el('p', 'sum-kcal', kcalLine(S)));
+  if (S.extra) box.append(el('p', 'sum-kcal', kcalLine(S)));
   const trend = periodTrend(S.y, S.m);
   if (trend.length > 1) {
     box.append(el('h4', '', `Últimos ${trend.length} ${state.settings.cycleStart ? 'ciclos' : 'meses'}`));
@@ -1303,7 +1313,7 @@ async function summaryImage(S) {
   txt(` ${avgUnit(S.avg)} en promedio · cupo ${quotaN(S.quota)}`, PAD + 16 + aw + 4, y + 31, 14, 600, col.paper);
   if (cmp) txt(cmp.text.charAt(0).toUpperCase() + cmp.text.slice(1), PAD + 16, y + 56, 14, 600, cmp.dir === 'down' ? col.good : cmp.dir === 'up' ? col.over : col.muted);
   y += (cmp ? 70 : 48) + 28;
-  if (S.kcal) { txt(kcalLine(S), PAD, y - 6, 15, 600, col.paper); y += 26; }
+  if (S.extra) { txt(kcalLine(S), PAD, y - 6, 15, 600, col.paper); y += 26; }
 
   if (trend.length > 1) {
     y = section(`Últimos ${trend.length} ${state.settings.cycleStart ? 'ciclos' : 'meses'}`, y);
@@ -1966,8 +1976,20 @@ function renderEditJoy() {
 
 // the estimate for the parts picked right now, as the placeholder (typing a number overrides it)
 function renderKcalHint() {
-  $('eKcal').placeholder = `≈ ${kcalEstimate({ partes: editParts, completa: editCompleta })} (estimado)`;
+  const draft = { partes: editParts, completa: editCompleta, momento: $('eMeal').value, kcal: kcalInput($('eKcal').value) };
+  $('eKcal').placeholder = `≈ ${kcalEstimate(draft)} (estimado)`;
+  $('eKcalHint').textContent = extraHint(draft);
 }
+// "La cena de tu plan son 600 kcal: esto es +300 extra" / "Alcohol solo: va además del plan, es todo extra"
+function extraHint(e) {
+  const plan = planKcal(e.momento);
+  const extra = `≈ ${fmtExtra(extraOf(e))}`;
+  if (!replacesMeal(e)) return `Va además de la comida del plan: ${extra}.`;
+  if (!plan) return `${extra}. Sin calorías del plan para ${withArticle(e.momento)} (se cargan en Ajustes), cuenta todo.`;
+  return `${withArticle(e.momento).replace(/^./, (c) => c.toUpperCase())} de tu plan: ${fmtKcal(plan)} → ${extra}.`;
+}
+$('eKcal').oninput = renderKcalHint;
+$('eMeal').onchange = renderKcalHint;
 
 $('editForm').addEventListener('submit', (ev) => {
   ev.preventDefault();
@@ -2085,6 +2107,7 @@ $('btnSettings').onclick = () => {
   $('appVersion').textContent = `Versión ${APP_VERSION}`;
   $('sQuota').value = state.settings.quota;
   for (const [k, v] of Object.entries(kcalTable())) $(`sKcal-${k}`).value = v;
+  for (const m of MEALS) $(`sPlan-${m}`).value = planKcal(m) || '';
   $('sWeekStart').value = String(state.settings.weekStart);
   $('sCycle').value = state.settings.cycleStart || '';
   $('sWeekStart').disabled = !!state.settings.cycleStart;
@@ -2107,6 +2130,7 @@ $('btnSaveSettings').onclick = () => {
     return;
   }
   state.settings.quota = Math.max(0, parseInt($('sQuota').value, 10) || 0);
+  state.settings.planKcal = Object.fromEntries(MEALS.map((m) => [m, kcalInput($(`sPlan-${m}`).value)]));
   state.settings.kcal = Object.fromEntries(Object.keys(DEFAULT_KCAL).map((k) => [k, kcalInput($(`sKcal-${k}`).value) || DEFAULT_KCAL[k]]));
   state.settings.weekStart = Number($('sWeekStart').value);
   const cyc = $('sCycle').value;
@@ -2138,13 +2162,13 @@ async function exportXlsx() {
   const rows = [...state.entries]
     .sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora))
     .map((e) => {
-      const flat = { ...e, valor: Math.round((thirdsOf(e) / 3) * 100) / 100, kcal: kcalOf(e) };
+      const flat = { ...e, valor: Math.round((thirdsOf(e) / 3) * 100) / 100, kcal: kcalOf(e), kcalPlan: planOf(e), kcalExtra: extraOf(e) };
       for (const [k] of PARTS) flat[k] = e.partes[k] ? 'Sí' : 'No';
       flat.completa = e.completa ? 'Sí' : 'No';
       return Object.fromEntries(COLUMNS.map(([k, h]) => [h, flat[k] ?? '']));
     });
   const ws = XLSX.utils.json_to_sheet(rows, { header: COLUMNS.map(([, h]) => h) });
-  ws['!cols'] = [12, 7, 11, 20, 9, 9, 22, 20, 40, 22, 12, 14, 40, 12].map((wch) => ({ wch }));
+  ws['!cols'] = [12, 7, 11, 20, 9, 9, 22, 20, 40, 22, 12, 14, 14, 14, 40, 12].map((wch) => ({ wch }));
 
   // Weekly summary sheet
   const weeks = {};
@@ -2153,6 +2177,7 @@ async function exportXlsx() {
     const w = weeks[from] || (weeks[from] = { thirds: 0, kcal: 0, comida: 0, alcohol: 0, postre: 0 });
     w.thirds += thirdsOf(e);
     w.kcal += kcalOf(e);
+    w.extra = (w.extra || 0) + extraOf(e);
     for (const [k] of PARTS) if (e.partes[k]) w[k]++;
     if (e.completa) w.completas = (w.completas || 0) + 1;
   }
@@ -2168,9 +2193,10 @@ async function exportXlsx() {
     'Permitidas': quota,
     'Diferencia': round2(quota - weeks[w].thirds / 3),
     'Calorías (aprox.)': weeks[w].kcal,
+    'Calorías extra': weeks[w].extra,
   }));
   const ws2 = XLSX.utils.json_to_sheet(summary, {
-    header: ['Semana desde', 'Comidas fuera del plan', 'Alcohol', 'Dulce', 'Completas', 'Comidas libres', 'Permitidas', 'Diferencia', 'Calorías (aprox.)'],
+    header: ['Semana desde', 'Comidas fuera del plan', 'Alcohol', 'Dulce', 'Completas', 'Comidas libres', 'Permitidas', 'Diferencia', 'Calorías (aprox.)', 'Calorías extra'],
   });
 
   const months = {};
@@ -2179,6 +2205,7 @@ async function exportXlsx() {
     const mo = months[k] || (months[k] = { thirds: 0, kcal: 0, comida: 0, alcohol: 0, postre: 0 });
     mo.thirds += thirdsOf(e);
     mo.kcal += kcalOf(e);
+    mo.extra = (mo.extra || 0) + extraOf(e);
     for (const [p] of PARTS) if (e.partes[p]) mo[p]++;
     if (e.completa) mo.completas = (mo.completas || 0) + 1;
   }
@@ -2190,7 +2217,8 @@ async function exportXlsx() {
     'Completas': months[k].completas || 0,
     'Comidas libres': round2(months[k].thirds / 3),
     'Calorías (aprox.)': months[k].kcal,
-  })), { header: ['Mes', 'Comidas fuera del plan', 'Alcohol', 'Dulce', 'Completas', 'Comidas libres', 'Calorías (aprox.)'] });
+    'Calorías extra': months[k].extra,
+  })), { header: ['Mes', 'Comidas fuera del plan', 'Alcohol', 'Dulce', 'Completas', 'Comidas libres', 'Calorías (aprox.)', 'Calorías extra'] });
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Comidas');
@@ -2287,6 +2315,7 @@ function openWhat(id) {
   $('whatInput').value = e.descripcion || '';
   $('whatKcal').value = e.kcal > 0 ? e.kcal : '';
   $('whatKcal').placeholder = `≈ ${kcalEstimate(e)} (estimado)`;
+  $('whatKcalHint').textContent = extraHint(e);
   const rec = $('whatRecent');
   rec.innerHTML = '';
   for (const d of recentWhats()) {
@@ -2339,7 +2368,11 @@ function saveWhat(text) {
 // kept even if you then tap "Después", like ¿Valió la pena?
 $('whatKcal').onchange = () => {
   const e = state.entries.find((x) => x.id === whatId);
-  if (e) { e.kcal = kcalInput($('whatKcal').value); persist(); }
+  if (e) { e.kcal = kcalInput($('whatKcal').value); persist(); $('whatKcalHint').textContent = extraHint(e); }
+};
+$('whatKcal').oninput = () => {
+  const e = state.entries.find((x) => x.id === whatId);
+  if (e) $('whatKcalHint').textContent = extraHint({ ...e, kcal: kcalInput($('whatKcal').value) });
 };
 
 // close, or move on to the next blank one when completing from the nudge
@@ -2441,6 +2474,7 @@ $('aiAnswer').oninput = showAiResult;
 $('aiUse').onclick = () => {
   const input = $(aiTarget);
   input.value = $('aiUse').dataset.kcal;
+  input.dispatchEvent(new Event('input'));
   input.dispatchEvent(new Event('change')); // "¿Qué fue?" saves it right away
   closeSheet('aiSheet');
   toast(`Listo: ${fmtKcal(Number(input.value))}`);
