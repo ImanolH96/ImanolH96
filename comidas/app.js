@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '69';
+const APP_VERSION = '70';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -12,6 +12,8 @@ const PARTS = [
 // "¿Valió la pena?": three faces stored on the Excel's 1-5 enjoyment scale (0 = not rated)
 const JOY = [[1, '😐', 'No tanto'], [3, '🙂', 'Estuvo bien'], [5, '😍', 'Valió la pena']];
 const joyOf = (v) => (v ? JOY.reduce((a, b) => (Math.abs(b[0] - v) < Math.abs(a[0] - v) ? b : a)) : null);
+// Calories: a rough estimate per part (editable in Ajustes), or the entry's own number when you type one.
+const DEFAULT_KCAL = { comida: 600, alcohol: 300, postre: 350, completa: 1200 };
 // Start time of each auto-detected meal; before breakfast counts as dinner (late night).
 const DEFAULT_RANGES = { Desayuno: '05:00', Almuerzo: '11:00', Merienda: '15:30', Cena: '19:00' };
 // Excel column headers <-> entry fields
@@ -27,6 +29,7 @@ const COLUMNS = [
   ['completa', 'Completa (1 comida libre)'],
   ['valor', 'Valor (comidas libres)'],
   ['disfrute', 'Disfrute (1-5)'],
+  ['kcal', 'Calorías (aprox.)'],
   ['notas', 'Notas'],
   ['id', 'ID'],
 ];
@@ -101,6 +104,20 @@ function weekBounds(ref = new Date()) {
 // A "completa" entry is a whole free meal on its own (e.g. a big off-plan meal), whatever parts it has.
 const partsOf = (e) => PARTS.filter(([k]) => e.partes && e.partes[k]).length;
 const thirdsOf = (e) => (e.completa ? 3 : partsOf(e));
+
+// ---------- calories: what each entry roughly added on top of the plan ----------
+
+const kcalTable = () => ({ ...DEFAULT_KCAL, ...state.settings.kcal });
+// estimate from the parts; a "completa" is its own number, like it's its own free meal
+function kcalEstimate(e) {
+  const K = kcalTable();
+  return e.completa ? K.completa : PARTS.reduce((n, [k]) => n + (e.partes[k] ? K[k] : 0), 0);
+}
+const kcalOf = (e) => (e.kcal > 0 ? e.kcal : kcalEstimate(e));
+const kcalBetween = (from, to) => state.entries.filter((e) => e.fecha >= from && e.fecha <= to).reduce((n, e) => n + kcalOf(e), 0);
+const fmtKcal = (n) => `${Math.round(n).toLocaleString('es')} kcal`;
+// typed number → whole kcal, or 0 (= use the estimate)
+const kcalInput = (v) => Math.max(0, Math.min(9999, Math.round(Number(v) || 0)));
 
 // Units (Ajustes → "Contar en"): by default amounts are free meals in thirds (⅓, ⅔, 1⅓…).
 // With settings.units = 'porciones' they're whole porciones instead: comida, alcohol or dulce = 1,
@@ -322,6 +339,7 @@ function tap(part) {
   // keys toggle: tapping what's already in this meal takes it out
   if (occ && (whole || occ.partes[part])) {
     if (!whole) occ.partes[part] = false;
+    delete occ.kcal; // a typed number was for the old parts; back to the estimate
     const empty = whole || !thirdsOf(occ);
     if (empty) state.entries = state.entries.filter((e) => e !== occ);
     persist();
@@ -332,6 +350,7 @@ function tap(part) {
   let target = occ;
   if (occ) {
     occ.partes[part] = true;
+    delete occ.kcal;
   } else {
     target = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
@@ -755,6 +774,8 @@ function renderWeek() {
   // the thirds just added get a little stamp when you land here from the keypad
   const fresh = freshWedges ? [used - freshWedges, used] : 0;
   box.append(weekHero({ used, quota, slices, current, daysLeft, fresh }));
+  const kcal = kcalBetween(from, to);
+  if (kcal) box.append(Object.assign(document.createElement('small'), { className: 'kcal-line', textContent: `≈ ${fmtKcal(kcal)} fuera del plan` }));
   freshWedges = 0;
 }
 
@@ -802,7 +823,7 @@ function entryRow(e, title) {
   const sub = document.createElement('span');
   const parts = [e.completa ? 'comida libre completa' : '', ...PARTS.filter(([k]) => e.partes[k]).map(([, l]) => l.toLowerCase())]
     .filter(Boolean).join(', ');
-  sub.textContent = e.descripcion || e.notas || parts.charAt(0).toUpperCase() + parts.slice(1);
+  sub.textContent = `${e.descripcion || e.notas || parts.charAt(0).toUpperCase() + parts.slice(1)} · ${e.kcal > 0 ? '' : '≈ '}${fmtKcal(kcalOf(e))}`;
   what.append(t, sub);
   const val = document.createElement('span');
   val.className = 'val';
@@ -928,6 +949,8 @@ function renderToday() {
   if (reserved) notes.push(inPorciones() ? `${porciones(reserved)} reservadas para eventos` : `${fmtThirds(reserved)} reservado para eventos`);
   const planned = state.alloc[from];
   if (planned) notes.push(`tu plan: ${fmtThirds(planned)} más`);
+  const kcal = kcalBetween(from, to);
+  if (kcal) notes.push(`≈ ${fmtKcal(kcal)} fuera del plan`);
   box.append(head, hero);
   if (notes.length) {
     const note = Object.assign(document.createElement('small'), { className: 'note' });
@@ -963,9 +986,10 @@ function periodSummary(y, m) {
   const quota = (Number(state.settings.quota) || 0) * 3;
   const entries = state.entries.filter((e) => e.fecha >= span.from && e.fecha <= span.to);
   const total = entries.reduce((n, e) => n + thirdsOf(e), 0);
+  const kcal = entries.reduce((n, e) => n + kcalOf(e), 0);
   const weeks = span.weeks.filter(([f]) => f <= today).map(([from, to]) => {
     const used = thirdsBetween(from, to);
-    return { from, to, used, slices: weekSlices(from, to), done: to < today, st: weekStatus(used, quota, to < today) };
+    return { from, to, used, kcal: kcalBetween(from, to), slices: weekSlices(from, to), done: to < today, st: weekStatus(used, quota, to < today) };
   });
   const count = (fn) => entries.filter(fn).length;
   const kinds = [...PARTS.map(([k, label, icon]) => ({ icon, label, n: count((e) => e.partes[k]) })),
@@ -981,7 +1005,8 @@ function periodSummary(y, m) {
   const inCourse = today >= span.from && today <= span.to;
   // average per week over the weeks that have started (the current one included)
   const avg = weeks.length ? total / weeks.length : 0;
-  return { y, m, span, quota, total, allowed: monthAllowance(y, m), weeks, kinds, byMeal, byDay, joy, inCourse, avg, title: periodTitle(y, m) };
+  const kcalAvg = weeks.length ? kcal / weeks.length : 0;
+  return { y, m, span, quota, total, kcal, kcalAvg, allowed: monthAllowance(y, m), weeks, kinds, byMeal, byDay, joy, inCourse, avg, title: periodTitle(y, m) };
 }
 
 // the period before (y, m), or null when it's before the plan / the first entry
@@ -1050,13 +1075,17 @@ function summaryLines(S) {
   };
 }
 
+// "≈ 5400 kcal en total · 1350 por semana"
+const kcalLine = (S) => `≈ ${fmtKcal(S.kcal)} en total · ${Math.round(S.kcalAvg).toLocaleString('es')} por semana`;
+
 function summaryText(S) {
   const L = summaryLines(S);
   const out = [`🍽️ Comidas libres · ${L.head}`, `Total: ${L.total}${L.course ? ` (${L.course.charAt(0).toLowerCase() + L.course.slice(1)})` : ''}`];
   const cmp = compareLine(S);
   out.push(`Promedio: ${fmtAvg(S.avg)} ${avgUnit(S.avg)} (cupo ${quotaN(S.quota)})${cmp ? `, ${cmp.text}` : ''}`);
+  if (S.kcal) out.push(`Calorías: ${kcalLine(S)}`);
   out.push('', 'Semanas:');
-  for (const w of S.weeks) out.push(`${w.st.icon} ${weekRangeLabel(w.from, w.to, true)}: ${fmtThirds(w.used)} de ${quotaN(S.quota)}`);
+  for (const w of S.weeks) out.push(`${w.st.icon} ${weekRangeLabel(w.from, w.to, true)}: ${fmtThirds(w.used)} de ${quotaN(S.quota)}${w.kcal ? ` (≈ ${fmtKcal(w.kcal)})` : ''}`);
   if (S.kinds.length) out.push('', `Qué fue: ${S.kinds.map((k) => `${k.icon} ${k.label.split(' ')[0].toLowerCase()} ${k.n}`).join(' · ')}`);
   if (L.when) out.push(`Cuándo: ${L.when}`);
   const rated = S.joy.filter((j) => j.list.length);
@@ -1089,6 +1118,7 @@ function openSummary() {
   box.append(avg);
   const cmp = compareLine(S);
   if (cmp) box.append(el('p', `sum-cmp ${cmp.dir}`, cmp.text.charAt(0).toUpperCase() + cmp.text.slice(1)));
+  if (S.kcal) box.append(el('p', 'sum-kcal', kcalLine(S)));
   const trend = periodTrend(S.y, S.m);
   if (trend.length > 1) {
     box.append(el('h4', '', `Últimos ${trend.length} ${state.settings.cycleStart ? 'ciclos' : 'meses'}`));
@@ -1273,6 +1303,7 @@ async function summaryImage(S) {
   txt(` ${avgUnit(S.avg)} en promedio · cupo ${quotaN(S.quota)}`, PAD + 16 + aw + 4, y + 31, 14, 600, col.paper);
   if (cmp) txt(cmp.text.charAt(0).toUpperCase() + cmp.text.slice(1), PAD + 16, y + 56, 14, 600, cmp.dir === 'down' ? col.good : cmp.dir === 'up' ? col.over : col.muted);
   y += (cmp ? 70 : 48) + 28;
+  if (S.kcal) { txt(kcalLine(S), PAD, y - 6, 15, 600, col.paper); y += 26; }
 
   if (trend.length > 1) {
     y = section(`Últimos ${trend.length} ${state.settings.cycleStart ? 'ciclos' : 'meses'}`, y);
@@ -1888,7 +1919,7 @@ function renderEditParts() {
     b.type = 'button';
     b.setAttribute('aria-pressed', String(!!editParts[k]));
     b.append(Object.assign(document.createElement('span'), { textContent: icon }), k === 'comida' ? 'Comida' : label);
-    b.onclick = () => { editParts[k] = !editParts[k]; renderEditParts(); };
+    b.onclick = () => { editParts[k] = !editParts[k]; renderEditParts(); renderKcalHint(); };
     box.appendChild(b);
   }
   const full = document.createElement('button');
@@ -1896,7 +1927,7 @@ function renderEditParts() {
   full.className = 'wide';
   full.setAttribute('aria-pressed', String(editCompleta));
   full.append(Object.assign(document.createElement('span'), { textContent: '🍽️' }), 'Contar como comida libre completa');
-  full.onclick = () => { editCompleta = !editCompleta; renderEditParts(); };
+  full.onclick = () => { editCompleta = !editCompleta; renderEditParts(); renderKcalHint(); };
   box.appendChild(full);
 }
 
@@ -1912,6 +1943,8 @@ function openEdit(id) {
   $('eMeal').innerHTML = MEALS.map((m) => `<option${m === e.momento ? ' selected' : ''}>${m}</option>`).join('');
   $('eDesc').value = e.descripcion || '';
   $('eNotes').value = [e.lugar, e.notas].filter(Boolean).join(' — ');
+  $('eKcal').value = e.kcal > 0 ? e.kcal : '';
+  renderKcalHint();
   editJoy = joyOf(e.disfrute)?.[0] || 0;
   renderEditJoy();
   renderEditParts();
@@ -1931,6 +1964,11 @@ function renderEditJoy() {
   }
 }
 
+// the estimate for the parts picked right now, as the placeholder (typing a number overrides it)
+function renderKcalHint() {
+  $('eKcal').placeholder = `≈ ${kcalEstimate({ partes: editParts, completa: editCompleta })} (estimado)`;
+}
+
 $('editForm').addEventListener('submit', (ev) => {
   ev.preventDefault();
   if (!thirdsOf({ partes: editParts, completa: editCompleta })) { toast('Marcá comida, alcohol, dulce o comida libre completa'); return; }
@@ -1946,6 +1984,7 @@ $('editForm').addEventListener('submit', (ev) => {
     lugar: '',
     notas: $('eNotes').value.trim(),
     disfrute: editJoy,
+    kcal: kcalInput($('eKcal').value),
   });
   persist();
   closeSheet('editSheet');
@@ -2045,6 +2084,7 @@ $('btnSettings').onclick = () => {
   $('sUnits').value = inPorciones() ? 'porciones' : 'tercios';
   $('appVersion').textContent = `Versión ${APP_VERSION}`;
   $('sQuota').value = state.settings.quota;
+  for (const [k, v] of Object.entries(kcalTable())) $(`sKcal-${k}`).value = v;
   $('sWeekStart').value = String(state.settings.weekStart);
   $('sCycle').value = state.settings.cycleStart || '';
   $('sWeekStart').disabled = !!state.settings.cycleStart;
@@ -2067,6 +2107,7 @@ $('btnSaveSettings').onclick = () => {
     return;
   }
   state.settings.quota = Math.max(0, parseInt($('sQuota').value, 10) || 0);
+  state.settings.kcal = Object.fromEntries(Object.keys(DEFAULT_KCAL).map((k) => [k, kcalInput($(`sKcal-${k}`).value) || DEFAULT_KCAL[k]]));
   state.settings.weekStart = Number($('sWeekStart').value);
   const cyc = $('sCycle').value;
   if (cyc !== (state.settings.cycleStart || '')) { monthRef = null; planMonth = null; stripOffset = 0; weekOffset = 0; }
@@ -2097,20 +2138,21 @@ async function exportXlsx() {
   const rows = [...state.entries]
     .sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora))
     .map((e) => {
-      const flat = { ...e, valor: Math.round((thirdsOf(e) / 3) * 100) / 100 };
+      const flat = { ...e, valor: Math.round((thirdsOf(e) / 3) * 100) / 100, kcal: kcalOf(e) };
       for (const [k] of PARTS) flat[k] = e.partes[k] ? 'Sí' : 'No';
       flat.completa = e.completa ? 'Sí' : 'No';
       return Object.fromEntries(COLUMNS.map(([k, h]) => [h, flat[k] ?? '']));
     });
   const ws = XLSX.utils.json_to_sheet(rows, { header: COLUMNS.map(([, h]) => h) });
-  ws['!cols'] = [12, 7, 11, 20, 9, 9, 22, 20, 40, 22, 12, 40, 12].map((wch) => ({ wch }));
+  ws['!cols'] = [12, 7, 11, 20, 9, 9, 22, 20, 40, 22, 12, 14, 40, 12].map((wch) => ({ wch }));
 
   // Weekly summary sheet
   const weeks = {};
   for (const e of state.entries) {
     const [from] = weekBounds(parseDate(e.fecha));
-    const w = weeks[from] || (weeks[from] = { thirds: 0, comida: 0, alcohol: 0, postre: 0 });
+    const w = weeks[from] || (weeks[from] = { thirds: 0, kcal: 0, comida: 0, alcohol: 0, postre: 0 });
     w.thirds += thirdsOf(e);
+    w.kcal += kcalOf(e);
     for (const [k] of PARTS) if (e.partes[k]) w[k]++;
     if (e.completa) w.completas = (w.completas || 0) + 1;
   }
@@ -2125,16 +2167,18 @@ async function exportXlsx() {
     'Comidas libres': round2(weeks[w].thirds / 3),
     'Permitidas': quota,
     'Diferencia': round2(quota - weeks[w].thirds / 3),
+    'Calorías (aprox.)': weeks[w].kcal,
   }));
   const ws2 = XLSX.utils.json_to_sheet(summary, {
-    header: ['Semana desde', 'Comidas fuera del plan', 'Alcohol', 'Dulce', 'Completas', 'Comidas libres', 'Permitidas', 'Diferencia'],
+    header: ['Semana desde', 'Comidas fuera del plan', 'Alcohol', 'Dulce', 'Completas', 'Comidas libres', 'Permitidas', 'Diferencia', 'Calorías (aprox.)'],
   });
 
   const months = {};
   for (const e of state.entries) {
     const k = e.fecha.slice(0, 7);
-    const mo = months[k] || (months[k] = { thirds: 0, comida: 0, alcohol: 0, postre: 0 });
+    const mo = months[k] || (months[k] = { thirds: 0, kcal: 0, comida: 0, alcohol: 0, postre: 0 });
     mo.thirds += thirdsOf(e);
+    mo.kcal += kcalOf(e);
     for (const [p] of PARTS) if (e.partes[p]) mo[p]++;
     if (e.completa) mo.completas = (mo.completas || 0) + 1;
   }
@@ -2145,7 +2189,8 @@ async function exportXlsx() {
     'Dulce': months[k].postre,
     'Completas': months[k].completas || 0,
     'Comidas libres': round2(months[k].thirds / 3),
-  })), { header: ['Mes', 'Comidas fuera del plan', 'Alcohol', 'Dulce', 'Completas', 'Comidas libres'] });
+    'Calorías (aprox.)': months[k].kcal,
+  })), { header: ['Mes', 'Comidas fuera del plan', 'Alcohol', 'Dulce', 'Completas', 'Comidas libres', 'Calorías (aprox.)'] });
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Comidas');
@@ -2240,6 +2285,8 @@ function openWhat(id) {
   const pos = whatQueue ? ` · ${whatQueue.done + 1} de ${whatQueue.total}` : '';
   $('whatSub').textContent = `${e.momento} ${dayLabel(e.fecha)} · ${partsLine(e)}${pos}`;
   $('whatInput').value = e.descripcion || '';
+  $('whatKcal').value = e.kcal > 0 ? e.kcal : '';
+  $('whatKcal').placeholder = `≈ ${kcalEstimate(e)} (estimado)`;
   const rec = $('whatRecent');
   rec.innerHTML = '';
   for (const d of recentWhats()) {
@@ -2270,16 +2317,30 @@ function renderWhatJoy() {
   }
 }
 
+// the calories you gave the last time something had this description, so "pizza" remembers its number
+function lastKcalFor(text) {
+  const k = text.toLowerCase();
+  const prev = state.entries.filter((x) => x.id !== whatId && x.kcal > 0 && (x.descripcion || '').trim().toLowerCase() === k)
+    .sort((a, b) => (b.fecha + b.hora).localeCompare(a.fecha + a.hora))[0];
+  return prev ? prev.kcal : 0;
+}
+
 function saveWhat(text) {
   const e = state.entries.find((x) => x.id === whatId);
   const t = (text ?? $('whatInput').value).trim();
   if (e && t) {
     e.descripcion = t;
     e.disfrute = whatJoy;
+    e.kcal = kcalInput($('whatKcal').value) || lastKcalFor(t);
     persist();
   }
   nextWhat(!!t);
 }
+// kept even if you then tap "Después", like ¿Valió la pena?
+$('whatKcal').onchange = () => {
+  const e = state.entries.find((x) => x.id === whatId);
+  if (e) { e.kcal = kcalInput($('whatKcal').value); persist(); }
+};
 
 // close, or move on to the next blank one when completing from the nudge
 function nextWhat(saved) {
@@ -2412,6 +2473,9 @@ async function importXlsx(file) {
       disfrute: Math.max(0, Math.min(5, parseInt(e.disfrute, 10) || 0)),
       notas: String(e.notas || ''),
     });
+    const last = imported[imported.length - 1];
+    const kcal = kcalInput(e.kcal);
+    if (kcal && kcal !== kcalEstimate(last)) last.kcal = kcal; // the estimate stays live, so Ajustes can change it
   }
   if (!imported.length) { toast('No encontré filas válidas en el archivo'); return; }
   const choice = await ask(`Encontré ${imported.length} registros en el Excel.`, [

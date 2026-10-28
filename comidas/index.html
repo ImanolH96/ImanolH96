@@ -95,6 +95,7 @@
   .hero.over .num { color: var(--over); }
   .hero .sub { font-size: 13px; color: var(--muted); }
   .week-card { margin-top: 12px; background: var(--panel); border-radius: 16px; padding: 12px 14px 14px; }
+  .week-card .kcal-line { display: block; margin-top: 8px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
   .plates .w.fresh { animation: stamp .45s cubic-bezier(.2, 1.6, .4, 1); }
   .hero .plates { flex: none; height: 46px; width: auto; max-width: 62%; overflow: visible; }
   .plates .w { stroke: var(--panel); stroke-width: 2.5; stroke-linejoin: round; }
@@ -404,6 +405,7 @@
   .sum-avg b { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
   .sum-cmp { margin: -2px 0 0; font-size: 14px; font-weight: 700; color: var(--muted); }
   .sum-cmp.down { color: var(--good); } .sum-cmp.up { color: var(--over); }
+  .sum-kcal { margin: -2px 0 0; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .sum-trend { display: flex; gap: 10px; align-items: flex-end; justify-content: flex-start; }
   .sum-trend .tcol { flex: 0 1 64px; }
   .tcol { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
@@ -864,6 +866,7 @@
     </label>
     <div class="field"><span>¿Valió la pena? (opcional)</span><div class="joy-pick" id="eJoy"></div></div>
     <label class="field"><span>Qué fue (opcional)</span><input id="eDesc" placeholder="Pizza con amigos"></label>
+    <label class="field"><span>Calorías aprox. (opcional)</span><input type="number" id="eKcal" min="0" max="9999" step="10" inputmode="numeric"></label>
     <label class="field"><span>Notas (opcional)</span><textarea id="eNotes" placeholder="Dónde, con quién, cómo te sentiste"></textarea></label>
     <div class="actions">
       <button class="solid" type="submit">Guardar cambios</button>
@@ -919,6 +922,7 @@
       <div class="what-recent" id="whatRecent"></div>
     </div>
     <div class="field"><span>¿Valió la pena? (opcional)</span><div class="joy-pick" id="whatJoy"></div></div>
+    <label class="field"><span>Calorías aprox. (opcional)</span><input type="number" id="whatKcal" min="0" max="9999" step="10" inputmode="numeric" enterkeyhint="done"></label>
     <div class="actions">
       <button class="solid" type="submit">Listo</button>
       <button class="link" type="button" id="whatSkip">Después</button>
@@ -950,6 +954,13 @@
     <label class="field"><span>Contar en</span>
       <select id="sUnits"><option value="tercios">Comidas libres (⅓, ⅔, 1…)</option><option value="porciones">Porciones enteras (1 por parte, 3 la completa)</option></select>
     </label>
+    <p>Calorías aproximadas de cada parte. Se usan cuando no anotás las de un registro; podés pedirle los valores a tu nutri.</p>
+    <div class="row">
+      <label class="field"><span>🍔 Comida</span><input type="number" id="sKcal-comida" min="0" max="9999" step="10" inputmode="numeric"></label>
+      <label class="field"><span>🍷 Alcohol</span><input type="number" id="sKcal-alcohol" min="0" max="9999" step="10" inputmode="numeric"></label>
+      <label class="field"><span>🍰 Dulce</span><input type="number" id="sKcal-postre" min="0" max="9999" step="10" inputmode="numeric"></label>
+      <label class="field"><span>🍽️ Completa</span><input type="number" id="sKcal-completa" min="0" max="9999" step="10" inputmode="numeric"></label>
+    </div>
     <label class="field"><span>Fecha de tu consulta (inicio del plan)</span><input type="date" id="sCycle"></label>
     <p>Con la fecha cargada, cada "mes" es un ciclo de 4 semanas desde la consulta y las semanas empiezan ese día. Dejala vacía para usar los meses del calendario.</p>
     <div class="gcal-set" id="gcalSet" hidden><span>📅 Google Calendar configurado ✓</span><button class="link" type="button" id="gcalChange">Cambiar</button></div>
