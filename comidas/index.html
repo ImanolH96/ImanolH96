@@ -576,6 +576,15 @@
   .what-nudge { border-color: var(--completa); border-style: solid; }
   .what-nudge .backup-go { background: var(--completa); }
   .what-sub { margin: 4px 0 0; font-size: 14px; color: var(--muted); }
+  .kcal-row { display: flex; gap: 8px; align-items: stretch; }
+  .kcal-row input { flex: 1; }
+  .kcal-ai { flex: none; white-space: nowrap; padding: 8px 12px; font-size: 14px; }
+  .ai-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 15px; }
+  .ai-open { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .ai-open button { font-weight: 700; padding: 12px 6px; }
+  #aiCopy { margin-top: -8px; }
+  .ai-result { font-size: 16px; font-weight: 700; color: var(--paper); }
+  .ai-result.miss { font-weight: 500; color: var(--over); font-size: 14px; }
   #whatInput { font-size: 17px; }
   .what-recent-wrap { display: flex; flex-direction: column; gap: 6px; margin-top: -4px; }
   .what-recent-wrap small { font-size: 12.5px; color: var(--muted); }
@@ -866,7 +875,7 @@
     </label>
     <div class="field"><span>¿Valió la pena? (opcional)</span><div class="joy-pick" id="eJoy"></div></div>
     <label class="field"><span>Qué fue (opcional)</span><input id="eDesc" placeholder="Pizza con amigos"></label>
-    <label class="field"><span>Calorías aprox. (opcional)</span><input type="number" id="eKcal" min="0" max="9999" step="10" inputmode="numeric"></label>
+    <div class="field"><span>Calorías aprox. (opcional)</span><div class="kcal-row"><input type="number" id="eKcal" min="0" max="9999" step="10" inputmode="numeric"><button class="ghost kcal-ai" type="button" data-kcal="eKcal">📷 Calcular con IA</button></div></div>
     <label class="field"><span>Notas (opcional)</span><textarea id="eNotes" placeholder="Dónde, con quién, cómo te sentiste"></textarea></label>
     <div class="actions">
       <button class="solid" type="submit">Guardar cambios</button>
@@ -922,12 +931,39 @@
       <div class="what-recent" id="whatRecent"></div>
     </div>
     <div class="field"><span>¿Valió la pena? (opcional)</span><div class="joy-pick" id="whatJoy"></div></div>
-    <label class="field"><span>Calorías aprox. (opcional)</span><input type="number" id="whatKcal" min="0" max="9999" step="10" inputmode="numeric" enterkeyhint="done"></label>
+    <div class="field"><span>Calorías aprox. (opcional)</span><div class="kcal-row"><input type="number" id="whatKcal" min="0" max="9999" step="10" inputmode="numeric" enterkeyhint="done"><button class="ghost kcal-ai" type="button" data-kcal="whatKcal">📷 Calcular con IA</button></div></div>
     <div class="actions">
       <button class="solid" type="submit">Listo</button>
       <button class="link" type="button" id="whatSkip">Después</button>
     </div>
   </form>
+</div>
+
+<!-- calories with an AI: copy the prompt, attach a photo there, paste the answer back -->
+<div class="scrim" id="aiSheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="aiTitle">
+    <div>
+      <h3 id="aiTitle">Calcular calorías con IA</h3>
+      <p class="what-sub" id="aiSub"></p>
+    </div>
+    <ol class="ai-steps">
+      <li>Elegí una IA: el pedido queda copiado y se abre.</li>
+      <li>Adjuntá la foto de lo que comiste y pegá el pedido.</li>
+      <li>Copiá la respuesta, volvé y pegala acá abajo.</li>
+    </ol>
+    <div class="ai-open">
+      <button class="ghost" type="button" data-ai="https://chatgpt.com/">ChatGPT</button>
+      <button class="ghost" type="button" data-ai="https://claude.ai/new">Claude</button>
+      <button class="ghost" type="button" data-ai="https://gemini.google.com/app">Gemini</button>
+    </div>
+    <button class="link" type="button" id="aiCopy">Solo copiar el pedido</button>
+    <label class="field"><span>Respuesta de la IA</span><textarea id="aiAnswer" placeholder="Pegá acá la respuesta (termina en TOTAL: … kcal)"></textarea></label>
+    <p class="ai-result" id="aiResult" hidden></p>
+    <div class="actions">
+      <button class="solid" type="button" id="aiUse" disabled>Usar este número</button>
+      <button class="link" type="button" data-close>Cancelar</button>
+    </div>
+  </div>
 </div>
 
 <div class="scrim" id="summarySheet" hidden>

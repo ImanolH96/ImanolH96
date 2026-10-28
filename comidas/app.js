@@ -1,7 +1,7 @@
 'use strict';
 
 const STORE_KEY = 'comidas-libres:v1';
-const APP_VERSION = '70';
+const APP_VERSION = '71';
 const MEALS = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Snack'];
 // A full free meal = the three parts; each part counts as 1/3.
 const PARTS = [
@@ -2361,6 +2361,90 @@ function nextWhat(saved) {
 }
 
 $('whatForm').addEventListener('submit', (ev) => { ev.preventDefault(); saveWhat(); });
+
+// ---------- calories with an AI: no API or keys. The prompt is copied, the photo is attached in the
+// AI's own app, and the answer comes back by pasting; its last line "TOTAL: 850 kcal" gives the number.
+
+function kcalPrompt({ descripcion, notas, momento, partes, completa }) {
+  const what = completa ? 'comida libre completa' : PARTS.filter(([k]) => partes[k]).map(([, l]) => l.toLowerCase()).join(' + ');
+  return [
+    'Sos nutricionista. Estimá las calorías de lo que comí a partir de la foto que adjunto (si no hay foto, usá mi descripción). Lo uso para registrar mis desvíos del plan nutricional, así que necesito un número realista: ni optimista ni exagerado.',
+    '',
+    `Qué fue: ${descripcion || 'ver la foto'}`,
+    `Tipo: ${what} (${momento.toLowerCase()})`,
+    notas ? `Notas: ${notas}` : '',
+    '',
+    'Cómo estimar:',
+    '1. Identificá cada alimento y bebida.',
+    '2. Estimá la porción en gramos o ml con las referencias de la imagen (plato de unos 26 cm, cubiertos, vaso, mano, envase). Las porciones de restaurante suelen ser más grandes que las caseras.',
+    '3. Sumá lo que no se ve: aceite o manteca de la cocción, frituras, aderezos y salsas, queso, pan, azúcar de las bebidas.',
+    '4. Si hay alcohol, usá el volumen y la graduación típicos (cerveza 5 %, vino 13 %, tragos con gaseosa o jugo).',
+    '5. Si en la foto hay más de lo que comí yo (plato compartido, fuente, varias porciones), calculá solo mi parte según lo que escribí. Si no lo aclaré, asumí una porción normal para una persona.',
+    '6. Si algo no se distingue, elegí lo más probable en Uruguay y anotalo como supuesto. No me hagas preguntas: dame tu mejor estimación igual.',
+    '',
+    'Respondé corto, así:',
+    '- Una línea por alimento: nombre, porción estimada, kcal.',
+    '- Supuestos: una línea.',
+    '- Rango: mínimo–máximo kcal.',
+    '- Última línea, exactamente con este formato y un solo número redondeado a 10: TOTAL: 850 kcal',
+  ].filter((l, i, a) => l !== '' || a[i - 1] !== '').join('\n');
+}
+
+// "TOTAL: 1.250 kcal" → 1250; without a TOTAL line, the last "… kcal" in the text
+function kcalFromAnswer(text) {
+  const num = (s) => Number(s.replace(/[.,\s](?=\d{3}\b)/g, ''));
+  const total = text.match(/total[^\d\n]{0,20}(\d{1,2}[.,\s]?\d{3}|\d{2,4})/i);
+  if (total) return kcalInput(num(total[1]));
+  const all = [...text.matchAll(/(\d{1,2}[.,\s]?\d{3}|\d{2,4})\s*kcal/gi)];
+  return all.length ? kcalInput(num(all[all.length - 1][1])) : 0;
+}
+
+let aiTarget = null; // the kcal input that gets the number
+let aiText = '';
+function openAiKcal(inputId) {
+  const fromWhat = inputId === 'whatKcal';
+  const e = state.entries.find((x) => x.id === (fromWhat ? whatId : editingId));
+  if (!e) return;
+  const draft = fromWhat
+    ? { ...e, descripcion: $('whatInput').value.trim() || e.descripcion }
+    : { ...e, descripcion: $('eDesc').value.trim(), notas: $('eNotes').value.trim(), momento: $('eMeal').value, partes: editParts, completa: editCompleta };
+  aiTarget = inputId;
+  aiText = kcalPrompt(draft);
+  $('aiSub').textContent = draft.descripcion ? `Para: ${draft.descripcion}` : 'Tip: si escribís antes qué fue, la estimación sale mejor.';
+  $('aiAnswer').value = '';
+  showAiResult();
+  openSheet('aiSheet');
+}
+async function copyAiPrompt() {
+  try { await navigator.clipboard.writeText(aiText); return true; } catch (err) { return false; }
+}
+function showAiResult() {
+  const t = $('aiAnswer').value.trim();
+  const n = t ? kcalFromAnswer(t) : 0;
+  const r = $('aiResult');
+  r.hidden = !t;
+  r.className = n ? 'ai-result' : 'ai-result miss';
+  r.textContent = n ? `${fmtKcal(n)}` : 'No encontré el número. Fijate que la respuesta termine en "TOTAL: … kcal", o escribilo a mano.';
+  $('aiUse').disabled = !n;
+  $('aiUse').dataset.kcal = n;
+}
+for (const b of document.querySelectorAll('.kcal-ai')) b.onclick = () => openAiKcal(b.dataset.kcal);
+for (const b of document.querySelectorAll('[data-ai]')) {
+  b.onclick = () => {
+    // copy and open in the same tap: iOS only allows both right after a touch
+    copyAiPrompt().then((ok) => toast(ok ? 'Pedido copiado: adjuntá la foto y pegalo' : 'No se pudo copiar el pedido'));
+    window.open(b.dataset.ai, '_blank');
+  };
+}
+$('aiCopy').onclick = async () => toast((await copyAiPrompt()) ? 'Pedido copiado' : 'No se pudo copiar el pedido');
+$('aiAnswer').oninput = showAiResult;
+$('aiUse').onclick = () => {
+  const input = $(aiTarget);
+  input.value = $('aiUse').dataset.kcal;
+  input.dispatchEvent(new Event('change')); // "¿Qué fue?" saves it right away
+  closeSheet('aiSheet');
+  toast(`Listo: ${fmtKcal(Number(input.value))}`);
+};
 $('whatSkip').onclick = () => nextWhat(false);
 
 // ---- the nudge on Registrar ----
